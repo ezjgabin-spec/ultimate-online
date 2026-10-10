@@ -5259,7 +5259,17 @@ const FB_BASE = { p:FBP.pass.length, r:FBP.run.length };
    FOOTBALL  -  part 3: game flow, downs, clock, kicking, CPU drives
    ==================================================================== */
 const FB_QL = 300, FB_TS = 0.75;     // FB_TS slows the live play (1 = full speed)
-function fbMsg(txt,col,fr){ if (FBN.on && FBN.mode==='vs' && /CPU/.test(txt)) txt = txt.replace(/CPU/g, fbLabB()); FB.msg = { txt, col:col||'#fff', t:fr||60, t0:fr||60 }; }
+function fbMsg(txt,col,fr,aud){
+  if (FBN.on && FBN.mode==='vs' && /CPU/.test(txt)) txt = txt.replace(/CPU/g, fbLabB());
+  const m = { txt, col:col||'#fff', t:fr||60, t0:fr||60 };
+  if (aud && fbVs() && FBN.role==='host') {                                       // V81c: 'O' = only the offense sees it, 'D' = only the defense
+    if (fbHostSees(aud)) { m.hostOnly = true; FB.msg = m; FB.gmsg = null; } else { FB.gmsg = m; }
+    return;
+  }
+  FB.msg = m; FB.gmsg = null;
+}
+function fbHostSees(aud){ const s = FB.s; return aud==='O' ? !s.defMode : !!s.defMode; }
+function fbSfxAud(n, aud){ if (aud && fbVs() && FBN.role==='host') { if (fbHostSees(aud)) fbSfxRaw(n); else fbnFx(n); } else fbSfx(n); }
 function fbSfx(n){ fbSfxRaw(n); if (typeof FBN!=='undefined' && FBN.on && FBN.role==='host') fbnFx(n); }
 function fbSfxRaw(n){
   try {
@@ -5307,7 +5317,7 @@ function fbCallPlay(play){
 function fbSnapNow(){
   if (FB.scr!=='pre') return; const s = FB.s;
   if (fbOff().some(p => p.mto)) {                                    // a custom set: first SPACE = "HERE WE GO" (everyone shifts), you can't hike until they're set
-    if (!s.shiftGo) { s.shiftGo = true; fbMsg('HERE WE GO!', '#ffd24a', 60); if (fbVs()) fbPreNote('OFFENSE IS SHIFTING'); return; }
+    if (!s.shiftGo) { s.shiftGo = true; fbMsg('HERE WE GO!', '#ffd24a', 60, 'O'); return; }
     if (!FB.msg || FB.msg.txt!=='NOT SET YET - WAIT FOR EVERYONE') fbMsg('NOT SET YET - WAIT FOR EVERYONE', '#ff6b6b', 45); return;
   }
   fbStartLive();
@@ -5552,6 +5562,7 @@ function fbGoForFG(){ fbKickStart('fg', null); }
 function fbStep(){
   const s = FB.s; if (!s) return;
   if (FB.msg) { FB.msg.t--; if (FB.msg.t <= 0) FB.msg = null; }
+  if (FB.gmsg) { FB.gmsg.t--; if (FB.gmsg.t <= 0) FB.gmsg = null; }
   const sc = FB.scr;
   if (sc==='pre') {
     s.preT += 1/60;
@@ -5718,7 +5729,7 @@ function fbOverlay(){
   else if (sc==='pre' && s.defMode) fbDefPreDraw(g);
   else if (sc==='pre') {
     fbRoutes(g,0.9); fbLabels(g); fbYardLabels(g);
-    fbPanel(g,70,150,180,24,0.75); T((s.play.n||'PLAY')+' - '+(s.dmode==='blitz'?'WATCH FOR THE BLITZ':'READ THE DEFENSE'),160,154,'#ffd24a',5.5,'center');
+    fbPanel(g,70,150,180,24,0.75); T((s.play.n||'PLAY')+' - '+(s.dmode==='blitz' && !fbVs() ?'WATCH FOR THE BLITZ':'READ THE DEFENSE'),160,154,'#ffd24a',5.5,'center');
     if (FBN.on && FBN.role==='guest') T(FBN.mode==='coop' ? 'YOU ARE '+(s.rctl?s.rctl.role:'W1')+'  -  1 2 3 4 = W1 W2 W3 TE' : 'SPACE OR CLICK = SNAP',160,164,'#e8ecf8',6,'center');
     else { const mv = fbOff().some(p => p.mto); T(mv ? (s.shiftGo ? 'GETTING SET...  WAIT' : 'SPACE = "HERE WE GO" (EVERYONE SHIFTS)') : 'SPACE OR CLICK = SNAP',160,164,mv && s.shiftGo ? '#ffd24a' : '#e8ecf8',6,'center'); }
     if (!s.tutMode && !s.defMode) { const pc = Math.max(0, Math.ceil(FB_PLAYCLOCK - s.preT)); fbPanel(g,268,117,46,15,0.75); T('PLAY CLOCK',291,119.5,'#aeb9dc',3.8,'center'); T(String(pc),291,125,pc <= 5 ? '#ff6b6b' : '#ffffff',6.5,'center'); }
@@ -7479,7 +7490,7 @@ function fbAudibleO(i){                                            // the offens
   const dm = s.dmode;
   s.keepD = dm; if (s.defMode) s.cplay = p; else s.lastPlay = p;
   fbSetup(p); s.keepD = null; s.preT = 0; s.ball = { mode:'ground', x:s.los, z:0 };
-  FB.audOpen = false; fbMsg('AUDIBLE: '+a.n, '#ffd24a', 80); fbSfx('tick'); if (fbVs()) fbPreNote('OFFENSE CALLED AN AUDIBLE');
+  FB.audOpen = false; fbMsg('AUDIBLE: '+a.n, '#ffd24a', 80, 'O'); fbSfxAud('tick','O');
   if (FBN.on) { FBN.rv++; FBN.rsend = 3; }
 }
 function fbAudibleD(id){                                           // the defense changes its call at the line (keeps the offense's play)
@@ -7492,7 +7503,7 @@ function fbAudibleD(id){                                           // the defens
   O.forEach(o => { Object.assign(o.p, { x:o.x, z:o.z, vx:o.vx, vz:o.vz, face:o.face, st:o.st, mto:o.mto, route:o.route, ri:o.ri, man:o.man, auto:o.auto }); });
   Object.assign(s, { preT:sv.preT, motion:sv.motion, shiftGo:sv.shiftGo, hwg:sv.hwg, setT:sv.setT, cpuAud:sv.cpuAud, cpuAud2:sv.cpuAud2 }); if (sv.snapAt!==undefined) s.snapAt = sv.snapAt;
   if (sv.cam) s.camFocus = sv.cam; FB.camSnap = sv.snap; if (sv.cc) FB.cam = sv.cc;
-  FB.audOpen = false; fbMsg('DEFENSE AUDIBLE: '+a[1], '#ff9b8b', 80); fbSfx('tick'); if (fbVs()) fbPreNote('DEFENSE AUDIBLE: '+a[1]);
+  FB.audOpen = false; fbMsg('DEFENSE AUDIBLE: '+a[1], '#ff9b8b', 80, 'D'); fbSfxAud('tick','D');
   if (FBN.on) { FBN.rv++; FBN.rsend = 3; }
 }
 function fbAudDraw(g){
@@ -8201,8 +8212,9 @@ function fbPreNoteDraw(g){
 function fbnGuestFourth(id){
   const s = FB.s; if (!s || !s.f4 || !s.defMode) return;
   if (id==='fg' && 117 - s.yl > 62) return;
-  s.f4 = 0; FBN.hcall = null; FBN.gplay = null; FB.ddraw = false;
-  if (id==='go4') { fbMsg(fbLabB()+' GOES FOR IT','#ffd24a',100); return; }
+  s.f4 = 0;
+  if (id==='go4') return;                                   // going for it: nothing else changes, both players carry on picking their calls
+  FBN.hcall = null; FBN.gplay = null; FB.ddraw = false;
   fbDefFourth(id);
 }
 function fbnGuestOff(){ return FBN.on && FBN.role==='host' && FBN.mode==='vs' && FB.s.defMode; }
@@ -8376,14 +8388,14 @@ function fbnEncRig(p){
 function fbnSend(){
   const s = FB.s, R = FBN.room; if (!R) return;
   const f = {};
-  for (const k in s) { if (FBN_SKIP.has(k)) continue; const v = s[k], t = typeof v; if (t==='number') f[k] = fbnR(v); else if (t==='string' || t==='boolean') f[k] = v; }
+  for (const k in s) { if (FBN_SKIP.has(k) || (k==='dmode' && FBN.mode==='vs')) continue; const v = s[k], t = typeof v; if (t==='number') f[k] = fbnR(v); else if (t==='string' || t==='boolean') f[k] = v; }
   const b = s.ball, bo = b ? { m:b.mode, x:fbnR(b.x||0), y:fbnR(b.y||0), z:fbnR(b.z||0), vx:fbnR(b.vx||0), vy:fbnR(b.vy||0), vz:fbnR(b.vz||0), t0:fbnR(b.t0||0), dr:b.dropped?1:0, ry:fbnR(b.ry||0), sp:fbnR(b.spin||0),
                   h:b.h?b.h.role:null, th:b.thrower?b.thrower.role:null, bt:b.bt!==undefined ? fbnR(performance.now()/1000-b.bt) : undefined, vx0:fbnR(b.vx0||0), vz0:fbnR(b.vz0||0) } : null;
   const o = { k:'s', n:++FBN.sn, ea:FBN.lastEs, ak:[FBN.gts|0, Math.round(performance.now()-(FBN.gtsT||performance.now()))], sc:FB.scr, gs:fbnGuestScr(), dm:s.defMode?1:0, f, b:bo, cf:[fbnR(s.camFocus.x),fbnR(s.camFocus.z)],
               ct:s.ctl?s.ctl.role:null, cr:s.carrier?s.carrier.role:null, rc:s.rctl?s.rctl.role:null, gd:s.gdc?s.gdc.role:null, od:s.dctl?s.dctl.role:null,
               dl:FBN.dlT===null?null:Math.max(0,Math.ceil(FBN.dlT)), rv:FBN.rv };
   if (s.tgt) o.tg = [fbnR(s.tgt.x),fbnR(s.tgt.z)];
-  if (FB.msg) { const gm = FBN.mode==='vs' ? fbnGuestMsg(FB.msg.txt, FB.msg.col) : null; o.m = [FB.msg.txt, FB.msg.col, FB.msg.t]; if (gm) o.mg = gm; }
+  { const sm = FB.gmsg || (FB.msg && !FB.msg.hostOnly ? FB.msg : null); if (sm) { const gm = FBN.mode==='vs' && !FB.gmsg ? fbnGuestMsg(sm.txt, sm.col) : null; o.m = [sm.txt, sm.col, sm.t]; if (gm) o.mg = gm; } }
   if (FB.scr==='drive' || FB.scr==='over') o.dls = s.driveLines;
   if (FB.scr==='over' && s.cst) o.cst = s.cst;
   if (FB.scr==='kick' && s.kk) { const kk = {}; for (const k in s.kk) { const v = s.kk[k]; if (typeof v==='number') kk[k] = fbnR(v); else if (typeof v==='string' || typeof v==='boolean') kk[k] = v; } o.kk = kk; }
@@ -8395,8 +8407,9 @@ function fbnSend(){
   if (FBN.rsend > 0 && FBN.sn%5===0) { FBN.rsend--; fbnSendSetup(); }
 }
 function fbnSendSetup(){
-  const s = FB.s, ro = {}; fbOff().forEach(p => { if (p.route && p.route.length) ro[p.role] = p.route.map(r => [fbnR(r[0]),fbnR(r[1])]); });
-  FBN.room.emit('h',{ k:'p', rv:FBN.rv, ro, pn:s.play ? { n:s.play.n, t:s.play.t } : null, dm:s.dmode, pos:Object.assign({}, FB_POS) }).catch(()=>{});
+  const s = FB.s, ro = {}, hide = FBN.mode==='vs' && !s.defMode;          // 1v1: the defending friend never gets the offense's routes or play name
+  if (!hide) fbOff().forEach(p => { if (p.route && p.route.length) ro[p.role] = p.route.map(r => [fbnR(r[0]),fbnR(r[1])]); });
+  FBN.room.emit('h',{ k:'p', rv:FBN.rv, ro, pn:s.play ? { n:hide ? '' : s.play.n, t:s.play.t } : null, dm:FBN.mode==='vs' ? null : s.dmode, pos:Object.assign({}, FB_POS) }).catch(()=>{});
 }
 
 /* ---------------------------------------------------------------- GUEST */
@@ -8586,7 +8599,7 @@ function fbnLobbyDraw(g){
   if (FBN.msg && lead) T(FBN.msg,160,100,'#7ddc8a',5,'center');
 }
 function fbnWaitDraw(g){
-  const s = FB.s, sc = FB.scr; fbRoutes(g,0.5); fbYardLabels(g);
+  const s = FB.s, sc = FB.scr; if (!s.defMode && sc!=='dwait') fbRoutes(g,0.5); fbYardLabels(g);          // only the offense ever sees routes
   let t1 = 'PLEASE WAIT', t2 = '';
   if (sc==='wait') { t1 = 'THE QB IS CALLING THE PLAY'; t2 = 'YOU RUN AS '+(s.rctl ? s.rctl.role : FBN.rsel)+' - PRESS 1 2 3 4 TO SWITCH RECEIVER'; }
   else if (sc==='dwait') { t1 = 'THE DEFENSE IS BEING CALLED'; t2 = 'YOU WILL CONTROL ONE DEFENDER'; }
