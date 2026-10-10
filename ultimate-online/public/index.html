@@ -1232,7 +1232,7 @@ function applyTheme(){
 function numberTex(txt,col){
   return canvasTex(64,64,(g,w,h)=>{ g.font='bold 44px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.lineWidth=7; g.strokeStyle='rgba(0,0,0,.6)'; g.strokeText(txt,w/2,h/2+2); g.fillStyle=col; g.fillText(txt,w/2,h/2+2); });
 }
-const RIG_HEADK = 1.3;          // stylized arcade proportions: big heads
+const RIG_HEADK = 0.82;         // V81: athletic proportions (about 7 heads tall)
 function makeRig(o){
   const ghost = o.ghost || 0;
   const M = c => ghost ? new THREE.MeshBasicMaterial({color:'#ffa24a',transparent:true,opacity:ghost,depthWrite:false}) : lm(c);
@@ -1246,17 +1246,19 @@ function makeRig(o){
   const shoeMeshes = [];
   const mkLeg = (z) => {
     const hip = new THREE.Group(); hip.position.set(0,-0.1,z);
-    const th = C(cylM(0.245,0.2,0.95,M(skin),10)); th.position.y = -0.475; hip.add(th);
-    if (o.shortLen==='mid' || o.shortLen==='long') { const L2 = o.shortLen==='long' ? 0.98 : 0.58; const sl = C(cylM(0.235,0.225,L2,M(o.shorts),10)); sl.position.y = -0.05-L2/2+0.0; hip.add(sl); }
+    const th = C(cylM(0.245,0.2,0.95,M(skin),10)); th.position.y = -0.475; if (!ghost) { th.geometry.dispose(); th.geometry = limbGeo(0.95,[[0,0.235],[0.16,0.262],[0.38,0.255],[0.7,0.2],[1,0.168]],14); } hip.add(th);
+    if (o.shortLen==='mid' || o.shortLen==='long') { const L2 = o.shortLen==='long' ? 0.98 : 0.58; const sl = C(cylM(ghost ? 0.235 : 0.285,ghost ? 0.225 : 0.27,L2,M(o.shorts),10)); sl.position.y = -0.05-L2/2+0.0; hip.add(sl); }
     const knee = new THREE.Group(); knee.position.y = -0.95; hip.add(knee);
-    const sh = C(cylM(0.2,0.165,0.93,M(skin),10)); sh.position.y = -0.46; knee.add(sh);
-    const sock = C(cylM(0.2,0.2,0.24,M(o.sock || '#f0ece2'),10)); sock.position.y = -0.62; knee.add(sock);
+    const sh = C(cylM(0.2,0.165,0.93,M(skin),10)); sh.position.y = -0.46; if (!ghost) { sh.geometry.dispose(); sh.geometry = limbGeo(0.93,[[0,0.17],[0.16,0.205],[0.32,0.19],[0.7,0.128],[1,0.1]],14); } knee.add(sh);
+    const sock = C(cylM(ghost ? 0.2 : 0.165,ghost ? 0.2 : 0.15,ghost ? 0.24 : 0.36,M(o.sock || '#f0ece2'),10)); sock.position.y = ghost ? -0.62 : -0.7; knee.add(sock);
+    if (!ghost) { const kn = C(sphM(0.178,M(skin),true,10)); kn.scale.set(1,0.9,1); knee.add(kn); }
     const chunky = o.shoeType==='chunky', hi = o.shoeType==='high';
     const shoe = C(boxM(0.9,chunky?0.38:0.31,chunky?0.56:0.48,M(o.shoes))); shoe.position.set(0.19,chunky?-0.98:-1.0,0); knee.add(shoe);
     const toe = C(sphM(0.25,M(o.shoes),true,12)); toe.scale.set(1.05,chunky?0.72:0.6,chunky?1.12:0.98); toe.position.set(0.6,chunky?-1.04:-1.06,0); knee.add(toe);
     const sole = C(boxM(0.98,chunky?0.15:0.1,chunky?0.6:0.52,M(chunky||o.shoes!=='#ffffff'?'#f2f2f2':'#e2e2e6'),false)); sole.position.set(0.21,chunky?-1.15:-1.15,0); knee.add(sole);
     const swoosh = C(boxM(0.36,0.06,0.5,M(shade(o.shoes, o.shoes==='#ffffff' ? -150 : 60)),false)); swoosh.position.set(0.22,-0.98,0); swoosh.rotation.z = 0.25; knee.add(swoosh);
     shoeMeshes.push(toe,swoosh);
+    if (!ghost) { const li = [bkBox(0.18,-0.82,0,0.2,0.05,0.2,'#f4f4f4'), bkBox(-0.24,-0.9,0,0.06,0.15,0.16,'#f4f4f4'), bkBox(0.02,-0.84,0,0.12,0.04,0.3,shade(o.shoes,-20))]; for (let q = 0; q < 5; q++) li.push(bkBox(0.28+q*0.075,-0.84,0,0.03,0.022,0.24,'#f4f4f4')); const lace = new THREE.Mesh(bakeGeo(li), new THREE.MeshLambertMaterial({ vertexColors:true })); lace.position.set(0,0,0); lace.castShadow = false; knee.add(lace); }
     shoeMeshes.push(sock,shoe,sole);
     if (hi) { const cuff = C(cylM(0.165,0.18,0.3,M(o.shoes),8)); cuff.position.set(0.0,-0.88,0); knee.add(cuff); shoeMeshes.push(cuff); }
     pelvis.add(hip); return { hip, knee };
@@ -1286,25 +1288,31 @@ function makeRig(o){
     const sh = new THREE.Group(); sh.position.set(0,1.12,z*1.08);
     const armM = shirt==='tank' ? M(skin) : MJ(o.jersey);
     const cap = C(sphM(0.235,armM,true,10)); sh.add(cap);
-    const ua = C(cylM(0.2,0.175,0.76,armM,10)); ua.position.y = -0.38; sh.add(ua);
+    const ua = C(cylM(0.2,0.175,0.76,armM,10)); ua.position.y = -0.38; if (!ghost) { ua.geometry.dispose(); ua.geometry = limbGeo(0.76,[[0,0.19],[0.14,0.215],[0.34,0.212],[0.7,0.172],[1,0.15]],14); } sh.add(ua);
     const el = new THREE.Group(); el.position.y = -0.76; sh.add(el);
-    const fa = C(cylM(0.165,0.13,0.74,sleeveLong ? MJ(o.jersey) : M(skin),10)); fa.position.y = -0.37; el.add(fa);
+    const fa = C(cylM(0.165,0.13,0.74,sleeveLong ? MJ(o.jersey) : M(skin),10)); fa.position.y = -0.37; if (!ghost) { fa.geometry.dispose(); fa.geometry = limbGeo(0.74,[[0,0.155],[0.2,0.17],[0.5,0.135],[0.85,0.1],[1,0.088]],12); } el.add(fa);
     if (sleeveLong) { const cuff = C(cylM(0.15,0.15,0.1,MJ(shade(o.jersey,-30)),10,false)); cuff.position.y = -0.7; el.add(cuff); }
     const hand = C(sphM(0.215,M(skin),true,12)); hand.position.y = -0.84; hand.scale.set(1,1.1,0.9); el.add(hand);
+    let hd = null; if (!ghost) { hand.visible = false; hd = rigHandBuild(skin); hd.g.position.y = -0.73; if (z < 0) hd.g.scale.z = -1; el.add(hd.g); }
     const fing = C(cylM(0.045,0.04,0.34,M(skin),6)); fing.position.y = -1.05; fing.visible = false; el.add(fing);
-    upper.add(sh); return { sh, el, fing };
+    upper.add(sh); return { sh, el, fing, hand:hd };
   };
   const armA = mkArm(0.58), armB = mkArm(-0.58);
   // head
-  headG.position.y = 1.47; headG.scale.setScalar(RIG_HEADK); upper.add(headG);
+  headG.position.y = 1.40; headG.scale.setScalar(RIG_HEADK); upper.add(headG);
   const neck = C(cylM(0.14,0.16,0.3,M(skin),8)); neck.position.y = 0.08; upper.add(neck);
   const head = C(sphM(0.4*hs,M(skin),true,18)); head.position.y = 0.38; head.scale.set(0.95,1.05,0.9); headG.add(head);
   [-1,1].forEach(sd => { const ear = C(sphM(0.08*hs,M(skinD),true,6)); ear.position.set(-0.02,0.36,sd*0.37*hs); headG.add(ear); });
   const eyeM = ghost ? M('#000') : new THREE.MeshBasicMaterial({color:0x14100e});
-  [-1,1].forEach(sd => { const e = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.1*hs,0.09*hs), eyeM); e.position.set(0.36*hs,0.44*hs,sd*0.15*hs); headG.add(e);
-    const br = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.035,0.16*hs), eyeM); br.position.set(0.355*hs,0.56*hs,sd*0.15*hs); br.rotation.x = -sd*0.18; headG.add(br); });
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.2*hs), ghost ? M('#000') : new THREE.MeshBasicMaterial({color:0x3a1410}));
-  mouth.position.set(0.355*hs,0.2*hs,0); headG.add(mouth);
+  let mouth;
+  if (ghost) {
+    [-1,1].forEach(sd => { const e = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.1*hs,0.09*hs), eyeM); e.position.set(0.36*hs,0.44*hs,sd*0.15*hs); headG.add(e);
+      const br = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.035,0.16*hs), eyeM); br.position.set(0.355*hs,0.56*hs,sd*0.15*hs); br.rotation.x = -sd*0.18; headG.add(br); });
+    mouth = new THREE.Mesh(new THREE.BoxGeometry(0.05,0.05,0.2*hs), M('#000')); mouth.position.set(0.355*hs,0.2*hs,0); headG.add(mouth);
+  } else {
+    headG.add(rigFace(o, hs));
+    mouth = new THREE.Mesh(new THREE.BoxGeometry(0.03,0.035,0.17*hs), new THREE.MeshBasicMaterial({color:0x3a1410})); mouth.position.set(0.372*hs,0.19*hs,0); headG.add(mouth);
+  }
   // hair
   const h0 = headG.children.length;
   const hairM = M(o.hair), hairL = M(shade(o.hair,36));
@@ -1344,9 +1352,12 @@ function makeRig(o){
     }
   }
   const hairMeshes = headG.children.slice(h0);
-  if (o.beard && !ghost) { const bd = C(boxM(0.1,0.2,0.24*hs,M('#1c1411'),false)); bd.position.set(0.34*hs,0.08*hs,0); headG.add(bd); const mu = C(boxM(0.05,0.05,0.3*hs,M('#1c1411'),false)); mu.position.set(0.36*hs,0.28*hs,0); headG.add(mu); }
+  if (o.beard && !ghost) { const bc = '#1c1411', K = hs, it = [bkEll(0.3*K,0.0*K,0,0.1*K,0.1*K,0.17*K,bc,9), bkEll(0.27*K,0.15*K,0,0.1*K,0.06*K,0.3*K,bc,9)];
+    [-1,1].forEach(sd => { it.push(bkEll(0.2*K,0.2*K,sd*0.3*K,0.12*K,0.2*K,0.07*K,bc,7)); it.push(bkEll(0.37*K,0.235*K,sd*0.07*K,0.03*K,0.026*K,0.075*K,bc,6)); });
+    const bm = new THREE.Mesh(bakeGeo(it), new THREE.MeshLambertMaterial({ vertexColors:true })); bm.castShadow = false; headG.add(bm); }
   if (o.cap && !ghost) { const cp = C(cylM(0.43*hs,0.43*hs,0.2,M(o.cap),16)); cp.position.set(-0.01,0.68*hs,0); headG.add(cp); const br = C(boxM(0.4,0.05,0.5,M(o.cap),false)); br.position.set(0.45*hs,0.62*hs,0); headG.add(br); }
   if (o.headband) { const hb = C(cylM(0.43*hs,0.43*hs,0.13,M(o.band),16)); hb.position.set(-0.01,0.58*hs,0); headG.add(hb); }
+  if (!ghost) rigBodyDetail(null, o, { torso, chest, shorts, MJ, M, C, upper, pelvis, neck });
   root.scale.setScalar(o.scale || 1);
   scene.add(root);
   const rigOut = { root, pelvis, upper, headG, mouth, legs:[legA,legB], arms:[armA,armB], rip, numMeshes, jerseyMats: ghost?[]:jerseyMats, skin:o.skin, shoes:shoeMeshes, hairs:hairMeshes, S:o.scale||1, yaw:0, cur:[[0,0],[0,0]], ghost, lean:0 };
@@ -1462,6 +1473,7 @@ function updateRig(rig,P){
     arm.sh.rotation.x = (i===0 ? -1 : 1) * (P.spread||0);
     arm.el.rotation.z = cur[1]-cur[0];
     arm.fing.visible = !!P.point && i===0;
+    if (arm.hand) { let gp = P.grip; if (Array.isArray(gp)) gp = gp[i]; if (gp===undefined) gp = (i===0 ? P.trackF : P.trackB) ? 2 : 0; rigSetHandPose(arm.hand, gp|0); }
   });
 }
 
@@ -1664,6 +1676,128 @@ const _pv = new V3();
 function proj(x,y,z){
   _pv.set(x,y,z).project(camera);
   return [ (_pv.x*0.5+0.5)*W, (-_pv.y*0.5+0.5)*H, _pv.z ];
+}
+
+/* =============================== V81: sculpted bodies, real hands, detailed faces =============================== */
+// bake a list of primitive pieces into ONE vertex-coloured geometry (cheap to draw, easy to colour)
+function bakeGeo(items){
+  const P = [], N = [], C = [], tmp = new THREE.Color();
+  items.forEach(it => {
+    let g = it.g.index ? it.g.toNonIndexed() : it.g.clone(); g.applyMatrix4(it.m); g.computeVertexNormals && 0;
+    const pa = g.attributes.position.array, na = g.attributes.normal.array; tmp.set(it.c);
+    for (let i = 0; i < pa.length; i++) { P.push(pa[i]); N.push(na[i]); }
+    for (let i = 0; i < pa.length/3; i++) C.push(tmp.r, tmp.g, tmp.b);
+    g.dispose();
+  });
+  const G2 = new THREE.BufferGeometry();
+  G2.setAttribute('position', new THREE.Float32BufferAttribute(P,3)); G2.setAttribute('normal', new THREE.Float32BufferAttribute(N,3)); G2.setAttribute('color', new THREE.Float32BufferAttribute(C,3));
+  return G2;
+}
+const _bq = new THREE.Quaternion(), _bv = new THREE.Vector3(), _bs = new THREE.Vector3(), _bm = new THREE.Matrix4(), _by = new THREE.Vector3(0,1,0);
+const bkEll = (x,y,z,rx,ry,rz,c,seg) => ({ g:new THREE.SphereGeometry(1,seg||10,Math.max(5,Math.round((seg||10)*0.7))), m:new THREE.Matrix4().compose(new THREE.Vector3(x,y,z), new THREE.Quaternion(), new THREE.Vector3(rx,ry,rz)), c });
+const bkBox = (x,y,z,w,h,d,c,rx,ry,rz) => ({ g:new THREE.BoxGeometry(w,h,d), m:new THREE.Matrix4().compose(new THREE.Vector3(x,y,z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rx||0,ry||0,rz||0)), new THREE.Vector3(1,1,1)), c });
+function bkTube(ax,ay,az,bx,by,bz,r0,r1,c,seg){                      // a tapered rod between two points, with round ends
+  const out = [], a = new THREE.Vector3(ax,ay,az), b = new THREE.Vector3(bx,by,bz), d = b.clone().sub(a), L = d.length() || 0.001;
+  const q = new THREE.Quaternion().setFromUnitVectors(_by, d.clone().normalize());
+  out.push({ g:new THREE.CylinderGeometry(r1,r0,L,seg||6,1,true), m:new THREE.Matrix4().compose(a.clone().add(b).multiplyScalar(0.5), q, new THREE.Vector3(1,1,1)), c });
+  out.push(bkEll(ax,ay,az,r0,r0,r0,c,6)); out.push(bkEll(bx,by,bz,r1,r1,r1,c,6));
+  return out;
+}
+// an organic limb: a lathe through (radius, t) samples, centred on y=0, running from +len/2 (top) to -len/2
+function limbGeo(len, prof, seg){
+  const pts = [], n = prof.length;
+  for (let i = 0; i < n; i++) pts.push(new THREE.Vector2(prof[i][1], len/2 - prof[i][0]*len));
+  const sm = []; for (let i = 0; i < n-1; i++) for (let k = 0; k < 3; k++) { const t = k/3, u = i + t, a = pts[Math.max(0,i-1)], b = pts[i], c = pts[i+1], d = pts[Math.min(n-1,i+2)];
+    const tt = t*t, ttt = tt*t; sm.push(new THREE.Vector2(0.5*((2*b.x)+(-a.x+c.x)*t+(2*a.x-5*b.x+4*c.x-d.x)*tt+(-a.x+3*b.x-3*c.x+d.x)*ttt), 0.5*((2*b.y)+(-a.y+c.y)*t+(2*a.y-5*b.y+4*c.y-d.y)*tt+(-a.y+3*b.y-3*c.y+d.y)*ttt))); }
+  sm.push(pts[n-1]);
+  return new THREE.LatheGeometry(sm, seg || 14);
+}
+// the torso: a box bent into a V-shaped, chest-forward athlete's trunk (x = front, y = up, z = across the shoulders)
+function torsoGeo(w,h,d,vsh){
+  const g = new THREE.BoxGeometry(w,h,d,4,12,8), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), v = y/h + 0.5;                        // 0 waist .. 1 shoulders
+    const sm = t => t*t*(3-2*t);
+    let zs = 0.78 + 0.22*sm(Math.min(1,v/0.7)) + (v > 0.72 ? 0.05*sm((v-0.72)/0.28) : 0) - (v > 0.93 ? (v-0.93)*5 : 0);
+    zs = zs * (vsh||1);
+    let xs = 0.9 + 0.1*sm(Math.min(1,v/0.55)); const front = x > 0 ? 1 : 0;
+    let nx = x*xs + (front && v > 0.5 && v < 0.9 ? 0.05*Math.sin((v-0.5)/0.4*Math.PI)*Math.min(1,Math.abs(z)/0.3+0.2) : 0) + (!front && v > 0.5 ? -0.03*Math.sin((v-0.5)/0.5*Math.PI) : 0);
+    let fz = z*zs, fx = nx; { const u = fx/(w/2), v = fz/((d/2)*Math.max(zs,0.3)), q = Math.pow(Math.pow(Math.abs(u),4)+Math.pow(Math.abs(v),4),0.25) || 1, m = Math.max(Math.abs(u),Math.abs(v)); if (q > 0.0001) { const k = m/q; fx *= k; fz *= k; } }
+    p.setXYZ(i, fx, y, fz);
+  }
+  g.computeVertexNormals(); return g;
+}
+function shortsGeo(w,h,d){                                                // rounded hips that narrow toward the waistband
+  const g = new THREE.BoxGeometry(w,h,d,3,6,6), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), v = y/h + 0.5, zs = 0.84 + 0.16*(1-v)*(1-v)*0 + 0.1*Math.sin(Math.min(1,v*1.4)*Math.PI*0.5);
+    let fx = x, fz = z*zs; const u = fx/(w/2), t = fz/((d/2)*zs), q = Math.pow(Math.pow(Math.abs(u),3)+Math.pow(Math.abs(t),3),1/3) || 1, m = Math.max(Math.abs(u),Math.abs(t)); fx *= m/q; fz *= m/q; p.setXYZ(i,fx,y,fz); }
+  g.computeVertexNormals(); return g;
+}
+/* the hand: palm + 4 fingers (3 bones each) + a thumb, baked in three poses (0 relaxed, 1 gripping, 2 spread open).
+   Local frame: hangs along -y from the wrist, palm faces -z, thumb side is +x. Shared by every rig. */
+const RIG_HAND = {};
+function rigHandGeo(pose){
+  if (RIG_HAND[pose]) return RIG_HAND[pose];
+  const it = [], col = '#ffffff';
+  it.push(bkEll(0,-0.13,0,0.118,0.15,0.058,col,10)); it.push(bkEll(0,-0.02,0,0.085,0.07,0.055,col,8));                      // palm + heel
+  const fx = [0.085, 0.03, -0.025, -0.075], flen = [[0.115,0.07,0.055],[0.13,0.08,0.06],[0.12,0.075,0.055],[0.095,0.06,0.045]], rad = [0.029,0.03,0.028,0.025];
+  const cur = { 0:[[0.28,0.5,0.35],[0.34,0.58,0.4],[0.42,0.66,0.44],[0.5,0.72,0.46]], 1:[[0.95,1.2,0.8],[1.0,1.3,0.85],[1.05,1.3,0.85],[1.1,1.3,0.8]], 2:[[0.08,0.1,0.05],[0.05,0.08,0.04],[0.06,0.09,0.05],[0.1,0.12,0.06]] }[pose];
+  const fan = { 0:[0.05,0,-0.05,-0.1], 1:[0.02,0,-0.02,-0.04], 2:[0.38,0.12,-0.14,-0.4] }[pose];
+  for (let f = 0; f < 4; f++) {
+    let x = fx[f], y = -0.26, z = 0, ang = 0; const ph = fan[f];
+    for (let s = 0; s < 3; s++) { ang += cur[f][s]; const dy = -Math.cos(ang), dz = -Math.sin(ang), dx = Math.sin(ph) * -dy * 0.9, L = flen[f][s];
+      const nx = x + dx*L, ny = y + dy*L*Math.cos(ph), nz = z + dz*L; bkTube(x,y,z,nx,ny,nz,rad[f]*(1-s*0.1),rad[f]*(1-(s+1)*0.1),col,6).forEach(o => it.push(o)); x = nx; y = ny; z = nz; }
+  }
+  { const th = { 0:[[0.2,0.35],[0.5,0.5]], 1:[[0.5,0.8],[0.9,0.9]], 2:[[0.7,0.1],[0.0,0.05]] }[pose]; let x = 0.09, y = -0.08, z = -0.01, a = th[0][0] ? 0.55 : 0.5; const segs = [[0.1,0.1],[0.085,0.075],[0.07,0.06]];
+    let rot = pose===2 ? -0.75 : -0.5, cu = 0;
+    for (let s = 0; s < 3; s++) { cu += (th[Math.min(1,s)] ? th[Math.min(1,s)][1] : 0.3)*(s?0.8:0.4); const dy = -Math.cos(0.15+cu*0.2), dx = 0.55 + (pose===2 ? 0.3 : -0.1*s), dz = -(0.12 + cu*0.5), L = segs[s][0]*1.1, n = Math.hypot(dx,dy,dz);
+      const nx = x + dx/n*L, ny = y + dy/n*L, nz = z + dz/n*L; bkTube(x,y,z,nx,ny,nz,0.034*(1-s*0.12),0.031*(1-s*0.14),col,6).forEach(o => it.push(o)); x = nx; y = ny; z = nz; } }
+  const g = bakeGeo(it); RIG_HAND[pose] = g; return g;
+}
+function rigHandBuild(skin, glove){                                             // returns { g, meshes[3], mat }
+  const grp = new THREE.Group(), mat = new THREE.MeshLambertMaterial({ color:glove || skin, vertexColors:true }), poses = [];
+  for (let k = 0; k < 3; k++) { const m = new THREE.Mesh(rigHandGeo(k), mat); m.castShadow = true; m.visible = k===0; grp.add(m); poses.push(m); }
+  return { g:grp, poses, mat, pose:0 };
+}
+function rigSetHandPose(h, k){ if (h.pose===k) return; h.pose = k; h.poses.forEach((m,i) => { m.visible = i===k; }); }
+/* the face: eyes (white, iris, pupil, glint), lids, brows, nose, lips, jaw and cheeks, all in one baked mesh */
+function rigFace(o, hs){
+  const sk = new THREE.Color(o.skin), skD = sk.clone().multiplyScalar(0.78), lipC = sk.clone().lerp(new THREE.Color('#8a3a3a'), 0.45), hairC = o.hair || '#222', it = [];
+  const iris = new THREE.Color(o.eyeCol || '#3a2416'), K = hs;
+  [-1,1].forEach(sd => {
+    it.push(bkEll(0.345*K,0.44*K,sd*0.145*K,0.07*K,0.062*K,0.092*K,'#f4f1ea',10));                       // eyeball
+    it.push(bkEll(0.405*K,0.44*K,sd*0.145*K,0.02*K,0.042*K,0.042*K,'#'+iris.getHexString(),8));            // iris
+    it.push(bkEll(0.418*K,0.44*K,sd*0.145*K,0.012*K,0.022*K,0.022*K,'#0a0705',6));                         // pupil
+    it.push(bkEll(0.424*K,0.455*K,sd*(0.145-0.016)*K,0.008*K,0.01*K,0.01*K,'#ffffff',4));                 // glint
+    it.push(bkEll(0.352*K,0.488*K,sd*0.145*K,0.074*K,0.026*K,0.1*K,'#'+skD.getHexString(),8));              // upper lid
+    it.push(bkEll(0.352*K,0.402*K,sd*0.145*K,0.07*K,0.016*K,0.094*K,'#'+sk.clone().multiplyScalar(0.9).getHexString(),8));   // lower lid
+    it.push(bkBox(0.355*K,0.555*K,sd*0.155*K,0.05*K,0.035*K,0.17*K,hairC,-sd*0.14,0,0));                     // brow
+    it.push(bkEll(0.3*K,0.3*K,sd*0.2*K,0.06*K,0.05*K,0.075*K,'#'+sk.clone().multiplyScalar(1.04).getHexString(),8));   // cheek
+    it.push(bkEll(-0.02*K,0.38*K,sd*0.395*K,0.045*K,0.12*K,0.045*K,'#'+skD.getHexString(),6));             // ear (outer)
+  });
+  it.push(bkEll(0.385*K,0.31*K,0,0.07*K,0.085*K,0.058*K,'#'+sk.clone().multiplyScalar(0.96).getHexString(),8));      // nose
+  it.push(bkBox(0.36*K,0.4*K,0,0.045*K,0.2*K,0.06*K,'#'+sk.clone().multiplyScalar(0.98).getHexString(),0,0,-0.18));   // bridge
+  [-1,1].forEach(sd => it.push(bkEll(0.37*K,0.255*K,sd*0.05*K,0.035*K,0.026*K,0.034*K,'#'+skD.getHexString(),6)));     // nostrils
+  it.push(bkEll(0.35*K,0.17*K,0,0.05*K,0.022*K,0.1*K,'#'+lipC.getHexString(),8));                              // upper lip
+  it.push(bkEll(0.35*K,0.128*K,0,0.052*K,0.027*K,0.092*K,'#'+lipC.clone().multiplyScalar(1.1).getHexString(),8));   // lower lip
+  it.push(bkEll(0.31*K,0.045*K,0,0.07*K,0.075*K,0.14*K,'#'+sk.clone().multiplyScalar(0.99).getHexString(),9));     // chin / jaw
+  const m = new THREE.Mesh(bakeGeo(it), new THREE.MeshLambertMaterial({ vertexColors:true })); m.castShadow = false; return m;
+}
+function rigBodyDetail(r, o, ctx){                                              // called at the end of makeRig (not for ghosts)
+  const { torso, chest, shorts, MJ, M, C, upper, pelvis, neck } = ctx, skin = o.skin, skD = shade(skin,-14);
+  // trunk: bent box
+  torso.geometry.dispose(); torso.geometry = torsoGeo(0.68,1.25,1.1,1.0);
+  shorts.geometry.dispose(); shorts.geometry = shortsGeo(0.74,0.8,1.0);
+  chest.visible = false; upper.children.forEach(m => { if (m.isMesh && m.geometry.type==='BoxGeometry' && (Math.abs(m.geometry.parameters.height-1.2)<0.01 || Math.abs(m.geometry.parameters.height-0.1)<0.01) && m!==torso) m.visible = false; });
+  neck.geometry.dispose(); neck.geometry = limbGeo(0.4,[[0,0.2],[0.45,0.158],[1,0.15]],12); neck.position.y = 1.36;
+  // pecs, lats, traps, collar (jersey coloured so recolouring still works)
+  [-1,1].forEach(sd => {
+    const pec = C(sphM(0.2,MJ(o.jersey),true,10)); pec.scale.set(0.5,0.62,0.86); pec.position.set(0.28,0.98,sd*0.26); upper.add(pec);
+    const lat = C(sphM(0.24,MJ(o.jersey),true,10)); lat.scale.set(0.45,1.0,0.5); lat.position.set(-0.12,0.66,sd*0.5); upper.add(lat);
+    const trap = C(sphM(0.22,M(skin),true,10)); trap.scale.set(0.8,0.34,0.9); trap.position.set(-0.04,1.27,sd*0.27); trap.rotation.x = -sd*0.35; upper.add(trap);
+  });
+  // the pelvis: glutes and hips
+  [-1,1].forEach(sd => { const gl = C(sphM(0.27,M(o.shorts),true,10)); gl.scale.set(0.8,0.85,0.9); gl.position.set(-0.2,-0.12,sd*0.24); pelvis.add(gl); });
 }
 
 /* =====================================================================================
@@ -4169,19 +4303,23 @@ function fbBuild(){
     r.hairs.forEach(m => m.visible = false);
     const hm = new THREE.MeshPhongMaterial({color:hc,shininess:90,specular:'#aab4cc'}), cap = new THREE.Mesh(new THREE.SphereGeometry(0.5,16,10,0,Math.PI*2,0,Math.PI*0.45), hm), back = new THREE.Mesh(new THREE.SphereGeometry(0.5,16,12,-Math.PI/2,Math.PI,0,Math.PI*0.78), hm);
     [cap,back].forEach(m => { m.position.set(-0.02,0.42,0); m.scale.set(1.04,1.0,1.0); m.castShadow = true; r.headG.add(m); });
-    const stripe = boxM(0.9,0.05,0.12,lm('#fff'),false); stripe.position.set(-0.02,0.93,0); r.headG.add(stripe);
-    const mask = boxM(0.06,0.06,0.56,lm('#d0d0d8'),false); mask.position.set(0.45,0.3,0); r.headG.add(mask);
-    const mask2 = boxM(0.06,0.06,0.5,lm('#d0d0d8'),false); mask2.position.set(0.44,0.12,0); r.headG.add(mask2);
-    const bar = boxM(0.06,0.3,0.05,lm('#d0d0d8'),false); bar.position.set(0.45,0.22,0); r.headG.add(bar);
+    { const sb = []; for (let a = -78; a < 78; a += 12) { const a1 = a*Math.PI/180, a2 = (a+12)*Math.PI/180, R = 0.512; sb.push(...bkTube(-0.02+R*Math.sin(a1),0.42+R*Math.cos(a1),0,-0.02+R*Math.sin(a2),0.42+R*Math.cos(a2),0,0.04,0.04,'#ffffff',6)); }
+      const stripe = new THREE.Mesh(bakeGeo(sb), new THREE.MeshPhongMaterial({vertexColors:true,shininess:60})); r.headG.add(stripe); }
+    { const bars = [], gc = '#cfd3de';
+      for (const [y,x,w] of [[0.5,0.44,0.34],[0.38,0.5,0.4],[0.26,0.53,0.38],[0.14,0.5,0.34],[0.03,0.44,0.26]]) { for (let k = -4; k < 4; k++) bars.push(...bkTube(x,y,w*k/4,x,y,w*(k+1)/4,0.016,0.016,gc,5)); }
+      for (const z of [-0.2,-0.07,0.07,0.2]) bars.push(...bkTube(0.44-Math.abs(z)*0.15,0.52,z,0.5-Math.abs(z)*0.2,0.26,z*1.05,0.016,0.016,gc,5), ...bkTube(0.5-Math.abs(z)*0.2,0.26,z*1.05,0.44-Math.abs(z)*0.15,0.02,z*0.9,0.016,0.016,gc,5));
+      [-1,1].forEach(sd => { bars.push(...bkTube(0.2,0.6,sd*0.42,0.44,0.5,sd*0.2,0.02,0.02,gc,5)); bars.push(...bkTube(0.14,0.05,sd*0.38,0.2,-0.03,sd*0.14,0.016,0.016,'#2a2a30',5)); bars.push(...bkTube(0.2,-0.03,sd*0.14,0.2,-0.03,-sd*0.14,0.016,0.016,'#2a2a30',5)); });
+      const cage = new THREE.Mesh(bakeGeo(bars), new THREE.MeshPhongMaterial({ vertexColors:true, shininess:80, specular:'#ffffff' })); cage.castShadow = false; r.headG.add(cage);
+      const ear = new THREE.Mesh(new THREE.CylinderGeometry(0.11,0.11,0.05,10), lm(hc)); [-1,1].forEach(sd => { const e2 = ear.clone(); e2.rotation.x = Math.PI/2; e2.position.set(-0.02,0.3,sd*0.5); r.headG.add(e2); }); }
     r.upper.scale.set(1.0,1.0,1.1*wid); r.pelvis.scale.set(1,1,0.95+0.05*wid);
     const jc = off?'#1f5fd6':'#d23a2c', pm = lm(jc);
     [-1,1].forEach(sd => { const pad = new THREE.Mesh(new THREE.SphereGeometry(0.34,12,10), pm); pad.scale.set(0.8,0.75,1.05); pad.position.set(0.0,1.2,sd*0.64); pad.castShadow = true; r.upper.add(pad); });
     const chest = new THREE.Mesh(new THREE.CylinderGeometry(0.46,0.38,1.0,12), pm); chest.rotation.x = Math.PI/2; chest.scale.set(1,1.0,0.66); chest.rotation.set(0,0,0); chest.scale.set(0.62,1,1.05); chest.position.set(0,0.78,0); chest.castShadow = true; r.upper.add(chest);
     const belt = boxM(0.7,0.14,1.0,lm(off?'#10244f':'#4a0e0a'),false); belt.position.set(0,-0.38,0); r.pelvis.add(belt);
     r.pelvis.children.forEach(m => { if (m.isMesh && m.geometry.type==='BoxGeometry' && Math.abs(m.geometry.parameters.height-0.78)<0.01) { m.material.color.set(pants); m.scale.set(1.15,1.0,1.05); } });
-    r.legs.forEach(l => { [l.hip.children[0], l.knee.children[0]].forEach(m => m.scale.set(1.3,1,1.3)); });
+    r.legs.forEach(l => { l.hip.children[0].scale.set(1.28,1,1.28); const shn = l.knee.children[0]; shn.material.color.set(off?'#1f5fd6':'#d23a2c'); shn.scale.set(1.08,1,1.08); });
     const neck = boxM(0.26,0.12,0.5,lm(jc),false); neck.position.set(0,1.28,0); r.upper.add(neck);
-    r.arms.forEach(a => { const g1 = new THREE.Mesh(new THREE.SphereGeometry(0.2,8,6), lm('#f4f4f4')); g1.position.y = -0.82; g1.castShadow = true; a.el.add(g1); });
+    r.arms.forEach(a => { if (a.hand) a.hand.mat.color.set(off ? '#f2f2f2' : '#f2f2f2'); const tp = new THREE.Mesh(new THREE.CylinderGeometry(0.1,0.095,0.1,10), lm('#f4f4f4')); tp.position.y = -0.7; a.el.add(tp); });
     // ---- more real gear: seams, pads, socks, gloves, helmet decal ----
     const acc = off ? '#ff8a1f' : '#ffd24a', accM = lm(acc);
     r.legs.forEach((l,i) => {
@@ -4194,7 +4332,6 @@ function fbBuild(){
     r.arms.forEach(a => {
       const rg = new THREE.Mesh(new THREE.CylinderGeometry(0.175,0.175,0.07,8), accM); rg.position.y = -0.55; a.sh.add(rg);                    // sleeve ring
       const ep = new THREE.Mesh(new THREE.SphereGeometry(0.17,8,6), pm); ep.position.y = 0; a.el.add(ep);                                      // elbow pad
-      for (let f=-1;f<=1;f++) { const fg = boxM(0.05,0.2,0.05,lm('#f4f4f4'),false); fg.position.set(0.1,-0.95,f*0.08); a.el.add(fg); }       // glove fingers
     });
     const dec = new THREE.Mesh(new THREE.CircleGeometry(0.17,14), new THREE.MeshBasicMaterial({color:acc})); [-1,1].forEach(sd => { const d2 = dec.clone(); d2.position.set(-0.02,0.5,sd*0.52); d2.rotation.y = sd>0 ? 0 : Math.PI; r.headG.add(d2); });
     const yoke = boxM(0.64,0.07,1.05,accM,false); yoke.position.set(0,1.08,0); r.upper.add(yoke);
@@ -4230,6 +4367,7 @@ function fbPoseOf(p){
   if (st==='juke') { P.lean = 0.35; P.tilt = 0.2; }
   if (p.diveT > 0 || p.down || p.possT > 0) { P.run = false; P.trackF = P.trackB = true; }
   if (p.fall) P.fall = p.fall;
+  P.grip = (st==='carry') ? [1,1] : (st==='block'||st==='tackle') ? [2,2] : (st==='throw') ? [1,2] : (st==='catch'||st==='reach'||st==='drop') ? [2,2] : (P.trackF||P.trackB) ? [2,2] : [0,0];
   return P;
 }
 function fbRender(){
@@ -4506,7 +4644,7 @@ function fbLearnCall(r){
 }
 function fbStartLive(){
   const s = FB.s, play = s.play, los = s.los, run = fbIsRun(play);
-  s.live = true; s.t = 0; FB.scr = 'live'; s.phase = 'live';
+  s.live = true; s.t = 0; FB.scr = 'live'; s.phase = 'live'; s.audN = ''; s.audF = 0;
   const q = fbBy('QB'), D = FBD[FB.diff]; s.q0x = q.x;
   s.ball = run ? { mode:'held', h:q } : { mode:'snapfly', t:0, dur:0.38, x:los, y:0.9, z:0, vx:0, vy:0, vz:0 };
   fbOff().forEach(p => {
@@ -4591,7 +4729,8 @@ function fbLive(dt){
   if (q.throwAnim > 0) { q.throwAnim -= dt; q.thT = clamp(1-q.throwAnim/0.35,0,1); q.st = 'throw'; if (q.throwAnim <= 0) { q.thT = 0; q.st = 'ready'; } }
   // ---- handoff
   if (play.t==='run' && !play.sneak && !s.handed && s.t > 0.5) {
-    s.handed = true; const rb = fbBy('RB'); q.carry = false; q.st = 'ready'; rb.carry = true; rb.st = 'carry'; s.carrier = rb; s.ball = { mode:'held', h:rb }; s.ctl = rb; fbHeadStart(rb); fbMsg('HANDOFF', '#ffd24a', 50);
+    s.handed = true; const rb = fbBy('RB');
+    if (q.x > s.los + 0.25) fbHandoffDenied(q); else fbHandoffAnim(q, rb, 0.2, 'HANDOFF');        // V80: a visible handoff, and never from past the line
   }
   if (play.sneak && !s.carrier) { s.carrier = q; }
   fbCustomStep(dt);
@@ -5072,8 +5211,8 @@ function fbCamFocus(){
   const s = FB.s, f = s.camFocus, b = s.ball, tg = s.carrier || s.ctl || fbBy('QB');
   let fx = tg.x, fz = tg.z;
   if (b.mode==='fly' && s.thrown && !b.dropped) { fx = lerp(tg.x, b.x, 0.6); fz = lerp(tg.z, b.z, 0.5); }
-  if (s.defMode && s.dctl) { const rf = s.carrier || (b.mode==='held' && b.h ? b.h : b); fx = s.dctl.x; fz = s.dctl.z; }
-  if (FBN.on && FBN.role==='guest') { const mine = s.defMode ? s.dctl : (s.carrier || s.rctl); if (mine) { fx = mine.x; fz = mine.z; } }
+  if (s.defMode && s.dctl && !fbVs()) { const rf = s.carrier || (b.mode==='held' && b.h ? b.h : b); fx = s.dctl.x; fz = s.dctl.z; }
+  if (FBN.on && FBN.role==='guest' && !fbVs()) { const mine = s.defMode ? s.dctl : (s.carrier || s.rctl); if (mine) { fx = mine.x; fz = mine.z; } }
   f.x += (fx-f.x)*0.1; f.z += (fz-f.z)*0.1;
 }
 function fbSeparate(){
@@ -5168,7 +5307,7 @@ function fbCallPlay(play){
 function fbSnapNow(){
   if (FB.scr!=='pre') return; const s = FB.s;
   if (fbOff().some(p => p.mto)) {                                    // a custom set: first SPACE = "HERE WE GO" (everyone shifts), you can't hike until they're set
-    if (!s.shiftGo) { s.shiftGo = true; fbMsg('HERE WE GO!', '#ffd24a', 60); return; }
+    if (!s.shiftGo) { s.shiftGo = true; fbMsg('HERE WE GO!', '#ffd24a', 60); if (fbVs()) fbPreNote('OFFENSE IS SHIFTING'); return; }
     if (!FB.msg || FB.msg.txt!=='NOT SET YET - WAIT FOR EVERYONE') fbMsg('NOT SET YET - WAIT FOR EVERYONE', '#ff6b6b', 45); return;
   }
   fbStartLive();
@@ -5264,7 +5403,7 @@ function fbOver(){
 }
 
 /* ---------------------------------------------------------------- the summary screen */
-function fbShowDrive(lines, then){ const s = FB.s; FB.scr = 'drive'; s.driveLines = lines; s.driveT = 0; s.then = then; }
+function fbShowDrive(lines, then){ const s = FB.s; FB.scr = 'drive'; s.driveLines = fbVs() ? lines.map(fbVsLine) : lines; s.driveT = 0; s.then = then; }
 function fbDriveGo(){ const s = FB.s; if (FB.scr!=='drive' || s.driveT < 40) return; const t = s.then; s.then = null; if (t) t(); }
 
 /* ---------------------------------------------------------------- the CPU drive sim */
@@ -5416,10 +5555,12 @@ function fbStep(){
   const sc = FB.scr;
   if (sc==='pre') {
     s.preT += 1/60;
-    fbMotionStep();
+    fbMotionStep(); try { fbPreDefMove(1/60); } catch(e){ console.error('predef', e); }
+    if (s.audF > 0) { s.audF--; if (s.audF <= 0) s.audN = ''; }
     fbOff().forEach(p => { p.anim += 0.02; }); fbDef().forEach(p => { p.anim += 0.02; });
     if (s.preT > 0.9 && !s.cpuAud) { try { fbCpuAudible(); } catch(e){} }
-    if (s.defMode) { if (!s.snapAt) s.snapAt = (FBN.on && FBN.mode==='vs') ? 14 : 4 + Math.random()*4; if (!s.tutMode) { fbCamFocus(); if (s.preT > s.snapAt) { s.snapAt = 0; fbSnapNow(); } } }
+    if (s.defMode && fbVs()) { if (!s.tutMode) { fbCamFocus(); if (s.preT > FB_PLAYCLOCK) fbDelayOfGame(); } }       // V81: the other player is a real QB: same 20s play clock + delay of game, no auto-snap
+    else if (s.defMode) { if (!s.snapAt) s.snapAt = 4 + Math.random()*4; if (!s.tutMode) { fbCamFocus(); if (s.preT > s.snapAt) { s.snapAt = 0; fbSnapNow(); } } }
     else if (!s.tutMode && s.preT > FB_PLAYCLOCK) fbDelayOfGame();   // play clock ran out
   }
   else if (sc==='live') {
@@ -5567,6 +5708,7 @@ function fbOverlay(){
   const s = FB.s, sc = FB.scr;
   if (FB.intro) { try { fbIntroDraw(g); return; } catch(e){ console.error('introdraw',e); FB.intro = null; } }
   // soft vignette so the HUD reads
+  if (sc==='pre') { try { fbPreNoteDraw(g); } catch(e){} }
   if (sc!=='lobby') { if (s.tutMode && sc!=='drive') fbTutHud(g); else fbHud(g); }
   if (sc==='lobby') { if (FB.shop) fbShopDraw(g); else if (FB.stats) fbStatsDraw(g); else fbLobbyDraw(g); }
   else if (sc==='call') fbCallDraw(g);
@@ -5607,7 +5749,7 @@ function fbLobbyDraw(g){
   T(desc[FB.diff],160,102,'#ffe9a8',5.5,'center');
   if (FBN.on || PARTY.on) fbnLobbyDraw(g); else fbBtn(g,'play',100,114,120,24,'PLAY',{on:true,col:'#7ddc8a',size:10});
   if (PARTY.npc && !PARTY.on) T(PARTY.npc.name+' SUITS UP AS YOUR W1',160,55,'#7ddc8a',5,'center');
-  T('WASD MOVE  SHIFT SPRINT  CLICK + HOLD = THROW  SPACE = DIVE  E = JUKE  F = STIFF ARM',160,158,'#aeb9dc',4.6,'center');
+  T('WASD MOVE  SHIFT / RIGHT CLICK SPRINT  CLICK + HOLD = THROW  SPACE = DIVE  E = JUKE  F = STIFF ARM',160,158,'#aeb9dc',4.6,'center');
   T('WHEN THE CPU HAS THE BALL YOU CAN PLAY DEFENSE (OR SKIP IT)',160,167,'#aeb9dc',4.6,'center');
   fbBtn(g,'exit',6,5,76,12,'< PARK',{size:5});
   fbBtn(g,'tut',100,141,120,13,'TUTORIAL  (HOW TO PLAY)',{size:5.5,line:'#ffd24a',tc:'#ffe9a8'});
@@ -5666,7 +5808,7 @@ function fbLiveDraw(g){
       const f = s.charging ? s.charge : 0; g.fillStyle = f>0.8 ? '#ff5a4a' : f>0.5 ? '#ffd24a' : '#7ddc8a'; g.fillRect(mx+9,my+13-26*f,4,26*f);
       T(s.charging ? 'POWER' : 'HOLD',mx+17,my-3,'#fff',5,'left');
     }
-    if (!FB.full) { fbPanel(g,60,164,200,12,0.6); T('CLICK + HOLD = THROW   WASD MOVE   SHIFT SPRINT',160,167,'#cfd8f4',5,'center'); }
+    if (!FB.full) { fbPanel(g,60,164,200,12,0.6); T('CLICK + HOLD = THROW   WASD MOVE   SHIFT / RIGHT CLICK SPRINT',160,167,'#cfd8f4',5,'center'); }
   } else if (s.ctl && s.ctl.carry) {
     if (!FB.full) { fbPanel(g,60,164,200,12,0.6); T('WASD RUN   SHIFT SPRINT   SPACE DIVE   E JUKE   F STIFF ARM',160,167,'#cfd8f4',5,'center'); }
   } else if (s.turn) {
@@ -5699,7 +5841,7 @@ function fbKickDraw(g){
 function fbDriveDraw(g){
   const s = FB.s, L = s.driveLines || [];
   fbPanel(g,40,38,240,36+L.length*13,0.88);
-  L.forEach((t,i) => T(t,160,46+i*13,i===0?'#ffd24a':'#fff',i===0?8:6,'center'));
+  L.forEach((t,i) => T(fbVsFix(t),160,46+i*13,i===0?'#ffd24a':'#fff',i===0?8:6,'center'));
   if (s.driveT > 40 && (s.driveT>>4)&1) T(FBN.on ? 'CONTINUING...  (SPACE TO SKIP)' : 'SPACE / CLICK TO CONTINUE',160,50+L.length*13+8,'#7ddc8a',6,'center');
 }
 function fbOverDraw(g){
@@ -5798,6 +5940,7 @@ document.getElementById('game').addEventListener('pointerdown', e => {
     return;
   }
   e.stopImmediatePropagation(); e.preventDefault();
+  if (e.button===2) { keys.ShiftRight = true; FB.rmb = true; return; }          // V81: right click = sprint (hold)
   try { unlockAudio(); } catch(_){}
   const { px, py } = px0, s = FB.s, sc = FB.scr;
   FB.mouse = { x:px*W, y:py*H };
@@ -5834,6 +5977,7 @@ document.getElementById('game').addEventListener('pointermove', e => {
 }, true);
 window.addEventListener('pointerup', e => {
   if (!FB.on) return;
+  if (e.button===2) { if (FB.rmb) { FB.rmb = false; keys.ShiftRight = false; } return; }
   FB.drawing = false; FB.dragDot = null; FB.ddrag = null; FB.dragBall = false;
   const s = FB.s;
   if (FBN.on && FBN.role==='guest') { fbnGuestUp(); return; }
@@ -5850,6 +5994,8 @@ function fbDrawPt(x,y){
   if (arr.length >= 14) return;
   if (Math.hypot(pt[0]-last[0], pt[1]-last[1]) >= 2.2 || arr.length===0 && Math.hypot(pt[0]-st[0], pt[1]) >= 1.5) arr.push(pt);
 }
+
+window.addEventListener('blur', () => { if (FB && FB.rmb) { FB.rmb = false; keys.ShiftRight = false; } });
 
 /* ====================================================================
    FOOTBALL  -  part 5: the animation layer
@@ -6313,7 +6459,8 @@ function fbDefExit(){
 }
 function fbDefToCall(){
   const s = FB.s;
-  if (s.down === 4 && fbDefFourth()) return;
+  s.f4 = 0;
+  if (s.down === 4) { if (fbVs()) { s.f4 = 1; } else if (fbDefFourth()) return; }
   s.ending = false; s.celeDone = false; s.res = null; s.carrier = null; s.ctl = null; s.thrown = false; s.handed = false; s.turn = false; s.caught = false;
   s.cplay = fbCpuPlay(); fbSetup(s.cplay);
   s.ball = { mode:'ground', x:s.los, z:0 }; s.aimShow = false; s.tgtShow = false;
@@ -6353,25 +6500,26 @@ function fbCpuPlay(){
   let r = [0,1,2,3,4]; if (blitzD >= 2) r = [0,1,2]; r = r.filter(i => FBP.run[i].n !== last); if (!r.length) r = [0,1,2];
   const p = FBP.run[r[Math.floor(Math.random()*r.length)]]; s.lastCpuPlay = p.n; return Object.assign({ t:'run' }, p);
 }
-function fbDefFourth(){            // the CPU's fourth down: kick or go for it. returns true if the drive ended.
+function fbDefFourth(pick){            // the CPU's fourth down (or the other PLAYER's choice online): kick or go for it. returns true if the drive ended.
   const s = FB.s, y = s.yl, fgd = 117 - y;
   let go = s.toGo <= 2 && y >= 45 && Math.random() < 0.5;
   if (s.q === 4 && s.cpu < s.you && s.clock < 90) go = true;
+  if (pick) go = false;
   if (go) return false;
-  const lines = ['CPU FOURTH DOWN'];
-  if ((y >= 56 && fgd <= 56) || (s.q===4 && s.cpu < s.you && s.clock < 40 && y >= 48)) {
+  const vs = fbVs(), lines = [pick ? (pick==='fg' ? 'FOURTH DOWN - FIELD GOAL TRY' : 'FOURTH DOWN - PUNT') : 'CPU FOURTH DOWN'];
+  if (pick==='fg' || (!pick && ((y >= 56 && fgd <= 56) || (s.q===4 && s.cpu < s.you && s.clock < 40 && y >= 48)))) {
     const p = clamp(0.96 - Math.max(0,fgd-24)*0.014, 0.25, 0.97);
-    if (Math.random() < p) { s.cpu += 3; lines.push('CPU FIELD GOAL IS GOOD ('+Math.round(fgd)+' YD)', 'SCORE  YOU '+s.you+'  CPU '+s.cpu); fbDefFinish(lines, 25 + Math.round(rnd(-2,5)), 6); }
-    else { lines.push('CPU MISSES A '+Math.round(fgd)+' YD FIELD GOAL'); fbDefFinish(lines, Math.max(20, Math.round(100-y)), 6); }
+    if (Math.random() < p) { s.cpu += 3; lines.push((vs ? 'FIELD GOAL IS GOOD (' : 'CPU FIELD GOAL IS GOOD (')+Math.round(fgd)+' YD)', 'SCORE  YOU '+s.you+'  CPU '+s.cpu); fbDefFinish(lines, 25 + Math.round(rnd(-2,5)), 6); }
+    else { lines.push(vs ? 'THE '+Math.round(fgd)+' YD FIELD GOAL IS NO GOOD' : 'CPU MISSES A '+Math.round(fgd)+' YD FIELD GOAL'); fbDefFinish(lines, Math.max(20, Math.round(100-y)), 6); }
   } else {
-    const ny = y + rnd(34,47); lines.push('CPU PUNTS');
+    const ny = y + rnd(34,47); lines.push(vs ? 'THE PUNT GOES '+Math.round(ny-y)+' YDS' : 'CPU PUNTS');
     fbDefFinish(lines, ny >= 100 ? 20 : Math.max(5, Math.round(100-ny)), 8);
   }
   return true;
 }
 function fbDefFinish(lines, userYl, secs){
   const s = FB.s; s.clock -= (secs||0); fbDefExit();
-  lines.push('YOU TAKE OVER AT YOUR '+Math.round(userYl));
+  lines.push(fbVs() ? 'BALL GOES TO YOU AT YOUR '+Math.round(userYl) : 'YOU TAKE OVER AT YOUR '+Math.round(userYl));
   fbShowDrive(lines, () => fbClockGate(() => { fbSeries(userYl); s.play0 = null; fbToCall(); }));
 }
 function fbDefAfter(){
@@ -6444,7 +6592,7 @@ function fbDefCtlOne(d, K, fl, dt){
     if (d.dashT <= 0) { d.dashT = 0; if (!s.ending && !d.tackling) { d.stun = 0.7; d.st = 'lunge'; d.lungeT = 0.4; d.lungeDir = Math.random()<0.5?1:-1; d.tkLock = 0.5; } }
     return;
   }
-  const wx = il > 0 ? -iy/il*sp : 0, wz = il > 0 ? -ix/il*sp : 0;               // the camera looks down the field the other way
+  const fdr = fbFlip() ? -1 : 1, wx = il > 0 ? fdr*iy/il*sp : 0, wz = il > 0 ? fdr*ix/il*sp : 0;      // solo defense looks down the field the other way; online 1v1 everyone looks from behind the QB
   fbVel(d, wx, wz, dt, 34);
   d.st = d.carry ? 'carry' : (d.jumpT > 0 ? 'reach' : 'ready');
 }
@@ -6626,8 +6774,8 @@ function fbDefPreDraw(g){
   const s = FB.s; fbDefLabels(g); fbYardLabels(g); fbJobDraw(g); fbAudDraw(g);
   const left = Math.max(0, Math.ceil((s.snapAt||5) - s.preT));
   fbPanel(g,56,148,208,26,0.78);
-  T('CLICK A DEFENDER TO BECOME HIM  (15% QUICKER)',160,152,'#ffd24a',5.2,'center');
-  T(s.tutMode ? 'SPACE = SNAP' : (FBN.on && FBN.mode==='vs' ? 'THE QB SNAPS IT IN '+left : 'THE CPU SNAPS IT IN '+left),160,163,'#e8ecf8',5.5,'center');
+  T(fbVs() ? 'MOVE ANYWHERE BEHIND THE LINE  -  CLICK A DEFENDER TO SWITCH' : 'CLICK A DEFENDER TO BECOME HIM  (15% QUICKER)',160,152,'#ffd24a',5.2,'center');
+  T(s.tutMode ? 'SPACE = SNAP' : (fbVs() ? 'WASD MOVE  SHIFT / RIGHT CLICK SPRINT  -  PLAY CLOCK '+Math.max(0,Math.ceil(FB_PLAYCLOCK - s.preT)) : 'THE CPU SNAPS IT IN '+left),160,163,'#e8ecf8',5.5,'center');
   if (!s.tutMode && !FBN.on) fbBtn(g,'dback',4,16,52,11,'< CALL',{size:5});
   if (s.tutMode) fbBtn(g,'snap',252,152,60,18,'SNAP',{on:true,col:'#7ddc8a',size:7});
 }
@@ -6962,6 +7110,23 @@ function fbCpuCustomPlay(){
   if (!blk.RB) ro.RB = L[pick(['flat','check','swing','wheel'])](sgOf('RB'));
   if (blk.TE) delete ro.TE;
   return { n:'CPU '+(names[0]||'PASS').toUpperCase(), t:'custom', pers, ro, al, blk };
+}
+
+/* V81: before the snap the defender you control moves freely (anywhere except across the line) */
+function fbPreDefMove(dt){
+  const s = FB.s; if (!s || s.tutMode) return;
+  const L = [];
+  if (s.defMode && s.dctl && !(FBN.on && FBN.role==='guest')) L.push([s.dctl, keys]);
+  if (s.gdc) L.push([s.gdc, FBN.gk || {}]);
+  L.forEach(([d,K]) => {
+    if (!d || d.down || d.tackling) return;
+    const ix = (K.KeyD||K.ArrowRight ? 1:0) - (K.KeyA||K.ArrowLeft ? 1:0), iy = (K.KeyW||K.ArrowUp ? 1:0) - (K.KeyS||K.ArrowDown ? 1:0), il = Math.hypot(ix,iy);
+    const D = FBD[FB.diff], full = FB_SP[fbKind(d.role)]*D.def*1.15, spr = !!(K.ShiftLeft||K.ShiftRight), sp = spr ? full : full*0.6, f = fbFlip() ? -1 : 1;
+    fbVel(d, il>0 ? f*iy/il*sp : 0, il>0 ? f*ix/il*sp : 0, dt, 34);
+    d.st = 'ready'; if (il===0 && Math.hypot(d.vx,d.vz) < 0.9) d.face = angApproach(d.face, Math.PI, 0.12);
+    const minX = s.los + 0.55; if (d.x < minX) { d.x = minX; if (d.vx < 0) d.vx = 0; }
+    d.z = clamp(d.z, -FB_Z+1, FB_Z-1);
+  });
 }
 
 /* ====================================================================
@@ -7314,14 +7479,20 @@ function fbAudibleO(i){                                            // the offens
   const dm = s.dmode;
   s.keepD = dm; if (s.defMode) s.cplay = p; else s.lastPlay = p;
   fbSetup(p); s.keepD = null; s.preT = 0; s.ball = { mode:'ground', x:s.los, z:0 };
-  FB.audOpen = false; fbMsg('AUDIBLE: '+a.n, '#ffd24a', 80); fbSfx('tick');
+  FB.audOpen = false; fbMsg('AUDIBLE: '+a.n, '#ffd24a', 80); fbSfx('tick'); if (fbVs()) fbPreNote('OFFENSE CALLED AN AUDIBLE');
   if (FBN.on) { FBN.rv++; FBN.rsend = 3; }
 }
 function fbAudibleD(id){                                           // the defense changes its call at the line (keeps the offense's play)
   const s = FB.s, a = FB_AUD_D.find(x => x[0]===id); if (!a || FB.scr!=='pre') return;
   if (s.defMode) s.dcall = id;
-  s.keepD = id; fbSetup(s.play); s.keepD = null; s.preT = 0; s.ball = { mode:'ground', x:s.los, z:0 };
-  FB.audOpen = false; fbMsg('DEFENSE AUDIBLE: '+a[1], '#ff9b8b', 80); fbSfx('tick');
+  // V81: a defensive audible only re-sets the DEFENSE: the offense keeps its formation, shifts, routes and the play clock keeps running
+  const O = fbOff().map(p => ({ p, x:p.x, z:p.z, vx:p.vx, vz:p.vz, face:p.face, st:p.st, mto:p.mto, route:p.route, ri:p.ri, man:p.man, auto:p.auto }));
+  const sv = { preT:s.preT, motion:s.motion, shiftGo:s.shiftGo, hwg:s.hwg, setT:s.setT, cpuAud:s.cpuAud, cpuAud2:s.cpuAud2, snapAt:s.snapAt, cam:s.camFocus ? { x:s.camFocus.x, z:s.camFocus.z } : null, snap:FB.camSnap, cc:FB.cam ? Object.assign({}, FB.cam) : null };
+  s.keepD = id; fbSetup(s.play); s.keepD = null; s.ball = { mode:'ground', x:s.los, z:0 };
+  O.forEach(o => { Object.assign(o.p, { x:o.x, z:o.z, vx:o.vx, vz:o.vz, face:o.face, st:o.st, mto:o.mto, route:o.route, ri:o.ri, man:o.man, auto:o.auto }); });
+  Object.assign(s, { preT:sv.preT, motion:sv.motion, shiftGo:sv.shiftGo, hwg:sv.hwg, setT:sv.setT, cpuAud:sv.cpuAud, cpuAud2:sv.cpuAud2 }); if (sv.snapAt!==undefined) s.snapAt = sv.snapAt;
+  if (sv.cam) s.camFocus = sv.cam; FB.camSnap = sv.snap; if (sv.cc) FB.cam = sv.cc;
+  FB.audOpen = false; fbMsg('DEFENSE AUDIBLE: '+a[1], '#ff9b8b', 80); fbSfx('tick'); if (fbVs()) fbPreNote('DEFENSE AUDIBLE: '+a[1]);
   if (FBN.on) { FBN.rv++; FBN.rsend = 3; }
 }
 function fbAudDraw(g){
@@ -7351,14 +7522,24 @@ function fbCustomStart(play){
   const s = FB.s, q = fbBy('QB'), los = s.los;
   fbOff().forEach(p => { p.catchClock = undefined; p.cdHit = false; p.cdHitPending = false; });
   fbRigs.forEach(p => { p.possT = 0; p.wrapBy = null; p.wrapping = false; p.hsT = 0; p.slid = false; p.brkBy = null; p.hopU = 0; p.stiffT = 0; p.stiffCd = 0; p.offG = false; });
-  s.paDone = false; s.handed = s.handed && play.t==='run';
+  s.paDone = false; s.handed = s.handed && play.t==='run'; s.hoRest = null; s.hoCar = null;
   if (!fbIsCustom(play) && !play.pa) return;
   const hb = play.hb ? { x:los + play.hb[0], z:play.hb[1] } : null;
   const qro = (play.ro && play.ro.QB && play.ro.QB.length) ? play.ro.QB.map(([dx,dz]) => [los+dx, q.z+dz]) : null;
   if (play.t==='crun') {
     const car = fbBy(play.car); if (car) { car.spd = fbTopSpeed(car, true); if (!car.route) { const sg = car.z >= 0 ? 1 : -1; car.route = [[los-6.2, car.z + sg*3], [los-4.5, car.z + sg*8], [los+3, car.z + sg*12], [los+12, car.z + sg*14]]; } car.ri = 0; }
     if (play.mode==='toss' && car) car.spd = 3.0*fbRm(car);                         // V80: he drifts out slowly until the pitch arrives (then he gets full speed)
-    if (play.mode==='hand' && hb) { q.route = [[hb.x-0.3, hb.z]]; q.ri = 0; q.auto = true; q.spd = 5.2; }
+    if (play.mode==='hand' && hb) {
+      q.route = [[hb.x-0.3, hb.z]]; q.ri = 0; q.auto = true; q.spd = 5.2;
+      // V80: the carrier runs his drawn path up to the ball, takes the handoff there, THEN runs the rest of it
+      try {
+        const R = (car.route || []).map(p => [p[0], p[1]]), H = [hb.x, hb.z], pts = [[car.x, car.z]].concat(R); let bi = 0, bd = 1e9;
+        for (let i = 0; i < pts.length-1; i++) { const [ax,az] = pts[i], [bx,bz] = pts[i+1], vx = bx-ax, vz = bz-az, L2 = vx*vx+vz*vz || 1, t = clamp(((H[0]-ax)*vx + (H[1]-az)*vz)/L2, 0, 1), d = Math.hypot(ax+vx*t-H[0], az+vz*t-H[1]); if (d < bd) { bd = d; bi = i; } }
+        const pre = R.slice(0, bi).concat([H]); s.hoRest = R.slice(bi); s.hoCar = car.role; car.route = pre; car.ri = 0;
+        let LA = 0, px = car.x, pz = car.z; pre.forEach(p => { LA += Math.hypot(p[0]-px, p[1]-pz); px = p[0]; pz = p[1]; });
+        const tq = Math.hypot(q.x-H[0], q.z-H[1]) / 5.2; car.spd = clamp(LA / Math.max(tq, 0.45), 3.5, 9.8*fbRm(car));
+      } catch(e) { s.hoRest = null; }
+    }
   } else if (play.t==='cqb') {
     q.carry = true; q.st = 'carry'; s.carrier = q; s.ball = { mode:'held', h:q };
     q.route = qro || [[los+1, q.z], [los+9, q.z]]; q.ri = 0; q.auto = true; q.spd = 7.0*fbRm(q);
@@ -7373,6 +7554,7 @@ function fbCustomGive(car, txt){
   const s = FB.s, q = fbBy('QB');
   s.handed = true; q.carry = false; q.st = 'ready'; q.route = null; q.auto = false;
   car.carry = true; car.st = 'carry'; s.carrier = car; s.ball = { mode:'held', h:car }; s.ctl = car; car.auto = true; car.spd = fbTopSpeed(car, true); fbHeadStart(car);
+  if (s.hoRest && s.hoCar===car.role) { car.route = s.hoRest.length ? s.hoRest : [[car.x+12, car.z]]; car.ri = 0; s.hoRest = null; }
   fbMsg(txt, '#ffd24a', 50); fbSfx('catch');
 }
 function fbCustomStep(dt){
@@ -7383,8 +7565,9 @@ function fbCustomStep(dt){
     const car = fbBy(play.car);
     if (!car) return;
     if (play.mode==='hand') {
-      if (s.t > 0.2 && fbDist(car, q) < 1.5) fbCustomGive(car, 'HANDOFF');
-      else if (s.t > 3.2) { s.handed = true; q.carry = true; q.st = 'carry'; s.carrier = q; q.route = null; q.auto = false; fbMsg('NO MESH - QB KEEPS IT', '#ffd24a', 60); }
+      if (s.t > 0.2 && q.x > s.los + 0.25) { s.handed = true; fbHandoffDenied(q); }
+      else if (s.t > 0.2 && fbDist(car, q) < 1.6) { s.handed = true; fbHandoffAnim(q, car, 0.16, 'HANDOFF'); }
+      else if (s.t > 2.4) { s.handed = true; fbHandoffAnim(q, car, 0.22, 'HANDOFF'); }                   // forced: the exchange always happens
     } else if (s.t > 0.2 && s.ball.mode==='held' && s.ball.h===q) {
       if (!fbTossOk(car, q)) { if (s.t > 1.0) fbTossInvalid(q); return; }
       s.ball = { mode:'pitch', t:0, dur:0.42, x0:q.x, z0:q.z, x:q.x, y:1.2, z:q.z, tg:car.role }; fbMsg('TOSS!', '#ffd24a', 40); fbSfx('juke');
@@ -7393,7 +7576,7 @@ function fbCustomStep(dt){
   if (s.ball.mode==='pitch') {
     const b = s.ball, tg = fbBy(b.tg); b.t += dt; const u = Math.min(1, b.t/b.dur);
     b.x = lerp(b.x0, tg.x, u); b.z = lerp(b.z0, tg.z, u); b.y = 1.2 + Math.sin(u*Math.PI)*0.9;
-    if (u >= 1) fbCustomGive(tg, 'SWEEP!');
+    if (u >= 1) fbCustomGive(tg, b.msg || 'SWEEP!');
   }
   if (play.pa && !s.paDone && q.ri >= 1) { s.paDone = true; fbMsg('PLAY ACTION!', '#ffd24a', 45); }
 }
@@ -7970,6 +8153,17 @@ function fbStatsDraw(g){
   most.forEach((p,i) => { const y = 103 + i*9.4; T((i+1)+'  '+p.n,156,y,'#fff',4.8,'left'); T(p.c+' CALLS  '+p.y+' YDS',308,y,'#9fb0dc',4.4,'right'); });
 }
 
+/* ---------------------------------------------------------------- V80: handoffs - a visible exchange, never from past the line */
+function fbHandoffAnim(q, car, dur, msg){
+  const s = FB.s; if (!car) return;
+  q.st = 'ready'; q.route = null; q.auto = false;
+  s.ball = { mode:'pitch', t:0, dur, x0:q.x, z0:q.z, x:q.x, y:1.1, z:q.z, tg:car.role, msg }; fbSfx('juke');
+}
+function fbHandoffDenied(q){
+  const s = FB.s; s.handed = true; q.carry = true; q.st = 'carry'; s.carrier = q; s.ctl = q; q.route = null; q.auto = false; s.ball = { mode:'held', h:q }; s.hoRest = null;
+  fbMsg('PAST THE LINE - NO HANDOFF, QB KEEPS IT', '#ff6b6b', 110); fbSfx('tick');
+}
+
 /* =====================================================================================
    ONLINE FOOTBALL (host-authoritative). The party leader runs the whole game; the friend sends keys and
    draws what the host sends.   room = roomName(partyCode+'f')
@@ -7989,7 +8183,28 @@ const fbnBy = r => r ? fbBy(r) : null;
 const fbnIsHost = () => FBN.on && FBN.role==='host';
 const fbnIsGuest = () => FBN.on && FBN.role==='guest';
 function fbMain(){ if (FBN.on && FBN.role==='guest') fbnGuestStep(); else { fbStep(); if (FBN.on) fbnHostTick(); } }
-function fbDirNow(){ const s = FB.s; return s && s.defMode ? -1 : 1; }
+function fbVs(){ return !!(FBN.on && FBN.mode==='vs'); }
+function fbFlip(){ const s = FB.s; return !!(s && s.defMode && !fbVs()); }     // V81: online 1v1 = EVERYONE sees the play from behind the QB (solo / co-op defense keeps its own view)
+function fbDirNow(){ return fbFlip() ? -1 : 1; }
+function fbVsFix(t){                                                          // drive-screen text is written once (tokens) and read per player
+  if (typeof t!=='string' || t.indexOf('{')<0) return t; const g = FBN.role==='guest', on = fbnOtherName();
+  const H = g ? on : 'YOU', Hp = g ? on+"'S" : 'YOUR', G = g ? 'YOU' : on;
+  return t.replace(/\{Hp\}/g,Hp).replace(/\{H\}/g,H).replace(/\{G\}/g,G);
+}
+function fbVsLine(t){ return fbVs() ? String(t).replace(/\bCPU\b/g,'{G}').replace(/\bYOUR\b/g,'{Hp}').replace(/\bYOU\b/g,'{H}') : t; }
+function fbPreNote(txt){ const s = FB.s; if (!s) return; s.audN = txt; s.audF = 230; }
+function fbPreNoteDraw(g){
+  const s = FB.s; if (!s || !s.audN || !(s.audF > 0)) return;
+  const w = Math.min(300, s.audN.length*4.6 + 22); fbPanel(g,160-w/2,40,w,13,0.85); T(s.audN,160,43.5,'#ffd24a',5.6,'center');
+}
+// the other player's 4th down (they pick GO / FIELD GOAL / PUNT, just like you do)
+function fbnGuestFourth(id){
+  const s = FB.s; if (!s || !s.f4 || !s.defMode) return;
+  if (id==='fg' && 117 - s.yl > 62) return;
+  s.f4 = 0; FBN.hcall = null; FBN.gplay = null; FB.ddraw = false;
+  if (id==='go4') { fbMsg(fbLabB()+' GOES FOR IT','#ffd24a',100); return; }
+  fbDefFourth(id);
+}
 function fbnGuestOff(){ return FBN.on && FBN.role==='host' && FBN.mode==='vs' && FB.s.defMode; }
 function fbKeysOf(p){
   if (!FBN.on || FBN.role!=='host') return keys; const s = FB.s;
@@ -8103,6 +8318,7 @@ function fbnHostEv(e){
 }
 function fbnHostAct(e){
   const s = FB.s, id = e.id;
+  if ((id==='go4' || id==='fg' || id==='punt') && FBN.mode==='vs' && s.defMode) { fbnGuestFourth(id); return; }
   if (id==='cplay') { if (FBN.mode==='vs' && s.defMode) { const p = fbnCleanPlay(e.pl); if (p) FBN.gplay = p; } return; }
   if (/^aud\d$/.test(id)) { if (FB.scr==='pre' && FBN.mode==='vs' && s.defMode) fbAudibleO(+id.slice(3)); return; }
   if (/^daud\d$/.test(id)) { const a = FB_AUD_D[+id.slice(4)]; if (a && FB.scr==='pre' && FBN.mode==='vs' && !s.defMode) fbAudibleD(a[0]); return; }
@@ -8134,7 +8350,7 @@ function fbnHostTick(){
       if (sc==='call') fbCallPlay(Object.assign({ t:'pass' }, FBP.pass[Math.floor(Math.random()*FBP.pass.length)]));
       else if (sc==='dcall') fbDefPick('zone');
       else if (!s.defMode) { if (!FBN.gcall) FBN.gcall = 'zone'; }
-      else if (!FBN.gplay) FBN.gplay = fbCpuPlay();
+      else if (!FBN.gplay) { s.f4 = 0; FBN.gplay = fbCpuPlay(); }
     }
   } else FBN.dlT = null;
   if (sc==='kick') { FBN.kt += dt; if (FBN.kt > 9 && s.kk && s.kk.stage < 2) { FBN.kt = 0; if (s.kk.stage===1) s.kk.ac = (Math.random()-0.5)*0.4; fbKickLock(); } }
@@ -8167,7 +8383,7 @@ function fbnSend(){
               ct:s.ctl?s.ctl.role:null, cr:s.carrier?s.carrier.role:null, rc:s.rctl?s.rctl.role:null, gd:s.gdc?s.gdc.role:null, od:s.dctl?s.dctl.role:null,
               dl:FBN.dlT===null?null:Math.max(0,Math.ceil(FBN.dlT)), rv:FBN.rv };
   if (s.tgt) o.tg = [fbnR(s.tgt.x),fbnR(s.tgt.z)];
-  if (FB.msg) o.m = [FB.msg.txt, FB.msg.col, FB.msg.t];
+  if (FB.msg) { const gm = FBN.mode==='vs' ? fbnGuestMsg(FB.msg.txt, FB.msg.col) : null; o.m = [FB.msg.txt, FB.msg.col, FB.msg.t]; if (gm) o.mg = gm; }
   if (FB.scr==='drive' || FB.scr==='over') o.dls = s.driveLines;
   if (FB.scr==='over' && s.cst) o.cst = s.cst;
   if (FB.scr==='kick' && s.kk) { const kk = {}; for (const k in s.kk) { const v = s.kk[k]; if (typeof v==='number') kk[k] = fbnR(v); else if (typeof v==='string' || typeof v==='boolean') kk[k] = v; } o.kk = kk; }
@@ -8245,7 +8461,7 @@ function fbnApply(d){
   if (d.dls) s.driveLines = d.dls;
   if (d.cst) s.cst = d.cst;
   if (d.kk) s.kk = d.kk;
-  if (d.m) { if (!FB.msg || FB.msg.txt!==d.m[0]) FB.msg = { txt:d.m[0], col:d.m[1], t:d.m[2], t0:d.m[2] }; else FB.msg.t = d.m[2]; } else if (FB.msg && FB.msg.txt && d.n%3===0) FB.msg = null;
+  if (d.m) { const m0 = d.mg ? d.mg[0] : d.m[0], m1 = d.mg ? d.mg[1] : d.m[1]; if (!FB.msg || FB.msg.txt!==m0) FB.msg = { txt:m0, col:m1, t:d.m[2], t0:d.m[2] }; else FB.msg.t = d.m[2]; } else if (FB.msg && FB.msg.txt && d.n%3===0) FB.msg = null;
   if (d.gs!==FB.scr) { const prev = FB.scr; if (d.gs!=='dcall') { FB.ddraw = false; FB.ddrag = null; } FB.scr = d.gs; s.phase = d.gs; if (['call','dcall','pre','wait','dwait'].includes(d.gs) || prev==='lobby') { FB.camSnap = true; } if (d.gs==='pre') s.preT = d.f.preT||0; }
   if (flip) { FB.cam = null; FB.camSnap = true; }
   if (FB.scr!=='live' && FB.scr!=='dead') s.camFocus = { x:d.cf[0], z:d.cf[1] };
@@ -8253,6 +8469,8 @@ function fbnApply(d){
   FBN.snapNow = FBN.sn0===undefined; FBN.sn0 = 1;
   fbnApplyRigs(d.p, 0); FBN.snapNow = false;
   if (d.rv!==undefined) FBN.rv = d.rv;
+  if (!s.f4) FBN.f4sent = false;
+  s.fourth = !!s.f4 && !s.defMode && !FBN.f4sent; s.fourthSel = !s.fourth;
 }
 function fbnGuestStep(){
   const s = FB.s; if (!s) return; const sc = FB.scr;
@@ -8301,12 +8519,14 @@ function fbnGuestAct(id){
   if (id==='rpskip') { if (!FB.s.rpSkG) fbnEv({ n:'rsk' }); FB.s.rpSkG = true; fbSfx('tick'); return true; }
   if (id==='again') { fbnEv({ n:'act', id }); return true; }
   if (id==='lobby') { fbnClose(true); fbnToLobby(); return true; }
-  if (['dyes','dno','dalways','dback','go4','fg','punt','tut','tskip','play'].some(x => id===x)) return true;
+  if (id==='go4' || id==='fg' || id==='punt') { if (s.fourth && !s.fourthSel && FBN.mode==='vs') { if (id==='fg' && 127 - s.los > 62) { fbMsg('TOO FAR FOR A FIELD GOAL','#ff6b6b',70); return true; } FBN.f4sent = true; s.fourth = false; s.fourthSel = true; fbnEv({ n:'act', id }); fbSfx('tick'); } return true; }
+  if (['dyes','dno','dalways','dback','tut','tskip','play'].some(x => id===x)) return true;
   return false;
 }
 function fbnGuestKey(c){
   const s = FB.s, sc = FB.scr;
   if (sc==='replay') { if (c==='Space' || c==='Enter') fbAct('rpskip'); return; }
+  if (sc==='call' && s.fourth && !s.fourthSel) { if (c==='Digit1') fbAct('go4'); if (c==='Digit2') fbAct('fg'); if (c==='Digit3') fbAct('punt'); return; }
   if (sc==='call') { if (c==='KeyQ' || c==='KeyE' || c==='ArrowLeft' || c==='ArrowRight' || c==='Tab') { s.tab = ((s.tab|0)+1)%3; s.pg = 0; } else if ((s.tab|0)<2 && (c==='KeyZ' || c==='ArrowDown')) fbAct('pgp'); else if ((s.tab|0)<2 && (c==='KeyC' || c==='ArrowUp')) fbAct('pgn'); else if (/^Digit[1-6]$/.test(c)) fbAct('play'+(+c.slice(5)-1)); return; }
   if (sc==='dcall') { if (FB.ddraw) { if (c==='Enter') fbAct('ddrun'); return; } if (/^Digit[1-6]$/.test(c)) fbAct('dcall'+(+c.slice(5)-1)); return; }
   if (sc==='pre' || sc==='live') {
@@ -8407,6 +8627,21 @@ function fbnCleanPlay(p){
   else if (p.t==='cqb') out.n = 'QB RUN';
   else if (p.pa) Object.assign(out, { n:'PLAY ACTION', pa:true, hb, fake:R.includes(p.fake) && p.fake!=='QB' ? p.fake : 'RB' });
   return out;
+}
+
+/* the guest sees host-centred banners from their own side: swap who 'you' are */
+function fbnGuestMsg(txt, col){
+  const G = fbLabB(), H = cleanName(PARTY.nm,'OPP'), GRN = '#7ddc8a', RED = '#ff4d4d'; let t = null, c = col;
+  if (txt==='TOUCHDOWN!') { t = H+' TOUCHDOWN'; c = RED; }
+  else if (txt===G+' TOUCHDOWN') { t = 'TOUCHDOWN!'; c = GRN; }
+  else if (txt==='PICK SIX!!  TOUCHDOWN') { t = 'PICK SIX - '+H+' TOUCHDOWN'; c = RED; }
+  else if (txt==='PICK SIX - '+G+' TOUCHDOWN') { t = 'PICK SIX!!  TOUCHDOWN'; c = GRN; }
+  else if (txt==='FUMBLE! YOUR BALL') { t = 'FUMBLE! '+H+' RECOVERS'; c = RED; }
+  else if (txt==='FUMBLE! '+G+' RECOVERS') { t = 'FUMBLE! YOUR BALL'; c = GRN; }
+  else if (txt==='INTERCEPTED - YOUR BALL') { t = 'TURNOVER - '+H+' BALL'; c = RED; }
+  else if (txt==='TURNOVER - '+G+' BALL') { t = 'INTERCEPTED - YOUR BALL'; c = GRN; }
+  else if (txt.indexOf(G)>=0) t = txt.split(G).join('YOU');
+  return t ? [t, c] : null;
 }
 
 /* =====================================================================================
@@ -10628,7 +10863,7 @@ document.querySelectorAll('#pad button').forEach(btn => {
 buildSetup(); refresh(); snapshotRules();
 function buildBG(){ if (hemi) { applyTheme(); } }
 buildWorld(); buildRigs(); setupRenderer(); setupPossession('p1');
-API.dbg = { G, DUO, ECOP, ECO, proj, CHESTER, FBN, fbnCleanPlay, fbCustomBuild, fbnRunCustom, fbCadence, fbHutVoice, ECOM, fbCpuCustomPlay, fbCpuDPlan, fbSetup, fbRouteEnds, fbOver, ecoFbOnline, ECO, fbTossPre, fbTossOk, fbSnapNow };
+API.dbg = { G, DUO, ECOP, ECO, proj, CHESTER, FBN, fbnCleanPlay, fbCustomBuild, fbnRunCustom, fbCadence, fbHutVoice, ECOM, fbCpuCustomPlay, fbCpuDPlan, fbSetup, fbRouteEnds, fbOver, ecoFbOnline, ECO, fbTossPre, fbTossOk, fbSnapNow, makeRig, updateRig, THREE, shade, fbRigs, fbDefToCall, fbCam, R3, get fbScene(){return fbScene} };
 API.fb = { FB, FBP, FBD, defStart:(y,w)=>fbDefStart(y,w), defPick:id=>fbDefPick(id), defSet:d=>fbDefSet(d), defNear:()=>fbDefNearest(), tutStart:()=>fbTutStart(), cpuPoss:fbCpuPoss, cpuPlay:()=>fbCpuPlay(), enter:()=>fbEnter(), step:()=>fbStep(), act:id=>fbAct(id), call:p=>fbCallPlay(p), snap:()=>fbSnapNow(), throwTo:(x,z,p)=>fbThrow({x,z},p), rigs:fbRigs, by:fbBy, end:fbEnd, kickStart:fbKickStart, kickLock:fbKickLock, drive:fbDriveGo, cpu:fbCpuDrive, cam:()=>[fbCam.position.toArray(), FB.cam, FB.s.camFocus, fbSun.position.toArray()] };
 API.hub = { HUB, HUBP, enter:(s,f)=>hubEnter(s,f), step:()=>hubStep(), act:id=>hubAct(id), go:id=>hubGo(id), do:id=>hubDo(id), portals:HUB_PORTALS }; API.eco = { ECO, ecoBuy, ecoPayout, ecoBBEnd, ecoFbPlay, ecoFbEnd, ecoEquip, ecoItem, ecoShopEnter, ecoShopAct, ecoShopItems, ECO_DOORS, ECO_ITEMS, ecoCrateRoll, ecoRideNow, ECO_RSPEC };
 API.party = PARTY; API.fbn = FBN; API.fbnx = { main:()=>fbMain(), ev:e=>fbnEv(e), act:id=>fbnGuestAct(id), lead:m=>fbnLeaderStart(m) };
