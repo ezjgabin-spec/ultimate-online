@@ -4405,10 +4405,15 @@ function fbRender(){
     // camera
     const f = s.camFocus;
     const dir = fbDirNow();
-    const tx = f.x - 11.5*dir, ty = FB.scr==='kick' ? 6 : 9.6, tz = f.z*0.92;
-    if (!FB.cam) FB.cam = { x:tx, y:ty, z:tz, lx:f.x+13*dir, lz:f.z*0.9 };
-    const c = FB.cam, k = FB.camSnap ? 1 : 0.12; FB.camSnap = false;
-    c.x += (tx-c.x)*k; c.y += (ty-c.y)*k; c.z += (tz-c.z)*k; c.lx += (f.x+14*dir-c.lx)*k; c.lz += ((f.z*0.9)-c.lz)*k;
+    // V81d: the camera orbits around the play (angle th: 0 = behind the offense, PI = the other end). Turnovers swing it slowly; every other change jumps.
+    const tTh = dir < 0 ? Math.PI : 0, nowC = performance.now(), dtc = Math.min(0.1, (nowC - (FB.camTt || nowC))/1000); FB.camTt = nowC;
+    if (FB.camTh === undefined || FB.camSnap || FB.scr==='kick') FB.camTh = tTh;
+    else { const dth = tTh - FB.camTh, stp = Math.PI/1.6*dtc; FB.camTh = Math.abs(dth) <= stp ? tTh : FB.camTh + Math.sign(dth)*stp; }
+    const th = FB.camTh, rotating = Math.abs(th - tTh) > 0.001, cth = Math.cos(th), sth = Math.sin(th);
+    const tx = f.x - 11.5*cth, ty = FB.scr==='kick' ? 6 : 9.6, tz = f.z*0.92 - 11.5*sth, ltx = f.x + 14*cth, ltz = f.z*0.9 + 14*sth;
+    if (!FB.cam) FB.cam = { x:tx, y:ty, z:tz, lx:f.x+13*cth, lz:f.z*0.9+13*sth };
+    const c = FB.cam, k = (FB.camSnap || rotating) ? 1 : 0.12; FB.camSnap = false;
+    c.x += (tx-c.x)*k; c.y += (ty-c.y)*k; c.z += (tz-c.z)*k; c.lx += (ltx-c.lx)*k; c.lz += (ltz-c.lz)*k;
     fbCam.position.set(c.x,c.y,c.z);
     if (s && s.shake > 0.05) { const k = s.shake*0.03; fbCam.position.x += (Math.random()-0.5)*k; fbCam.position.y += (Math.random()-0.5)*k; fbCam.position.z += (Math.random()-0.5)*k; s.shake *= 0.9; }
     if (FB.scr==='kick') { fbCam.position.set(c.x-1,c.y+1,c.z); fbCam.lookAt(c.lx+6,0.5,c.lz); fbCam.fov = 62; }
@@ -4740,6 +4745,7 @@ function fbLive(dt){
     const K = fbKeysOf(c);
     let ix = (K.KeyD||K.ArrowRight ? 1:0) - (K.KeyA||K.ArrowLeft ? 1:0), iy = (K.KeyW||K.ArrowUp ? 1:0) - (K.KeyS||K.ArrowDown ? 1:0);
     let spr = !!(K.ShiftLeft||K.ShiftRight);
+    if (s.turn && fbDirNow() < 0) { ix = -ix; iy = -iy; }                                   // the camera looks the other way after a turnover: so do the sticks
     if ((s.defMode || FB.botO) && K===keys) { const a = fbCpuInput(c, dt); ix = a.dz; iy = a.dx; spr = a.spr; }
     const il = Math.hypot(ix,iy);
     const has = il > 0 || c.juke > 0;
@@ -5104,6 +5110,7 @@ function fbDrop(r, b, why, hitter, pbu){
 }
 function fbIntercept(d, b){
   const s = FB.s;
+  const needRot = fbDirNow() > 0;
   s.turn = true; d.carry = true; d.st = 'carry'; s.carrier = d; s.ball = { mode:'held', h:d }; s.tgtShow = false; s.aimShow = false; s.intX = d.x;
   fbDef().forEach(p => { p.tackling = false; });
   if (s.defMode) { if (d!==s.gdc) { s.dctl = d; } d.tkWin = 0; d.dashT = 0; if (s.tutMode) s.tutDefOk = true; }
@@ -5112,6 +5119,7 @@ function fbIntercept(d, b){
   const ch = fbOff().filter(o => !o.down).sort((a,b2) => fbDist(a,d)-fbDist(b2,d));
   s.ctl = ch[0]; ch[0].carry = false; ch[0].auto = false; ch[0].route = null;
   fbMsg('INTERCEPTED!', '#ff4d4d', 100); fbSfx('int');
+  if (!s.tutMode) { s.intFz = needRot ? 1.75 : 0.9; fbRigs.forEach(p => { p.vx = 0; p.vz = 0; }); }        // V81d: freeze the play while the camera swings around, then it all goes again
 }
 function fbIncomplete(txt){
   const s = FB.s; if (s.ending) return;
@@ -5574,6 +5582,7 @@ function fbStep(){
     else if (s.defMode) { if (!s.snapAt) s.snapAt = 4 + Math.random()*4; if (!s.tutMode) { fbCamFocus(); if (s.preT > s.snapAt) { s.snapAt = 0; fbSnapNow(); } } }
     else if (!s.tutMode && s.preT > FB_PLAYCLOCK) fbDelayOfGame();   // play clock ran out
   }
+  else if (sc==='live' && s.intFz > 0) { s.intFz -= 1/60; if (s.intFz <= 0) s.intFz = 0; fbRigs.forEach(p => { p.anim += 0.01; }); }
   else if (sc==='live') {
     // charging a throw
     if (s.charging) { s.chargeF = (s.chargeF||0)+1; s.charge = clamp(0.12 + s.chargeF/75, 0, 1); }
@@ -6603,7 +6612,7 @@ function fbDefCtlOne(d, K, fl, dt){
     if (d.dashT <= 0) { d.dashT = 0; if (!s.ending && !d.tackling) { d.stun = 0.7; d.st = 'lunge'; d.lungeT = 0.4; d.lungeDir = Math.random()<0.5?1:-1; d.tkLock = 0.5; } }
     return;
   }
-  const fdr = fbFlip() ? -1 : 1, wx = il > 0 ? fdr*iy/il*sp : 0, wz = il > 0 ? fdr*ix/il*sp : 0;      // solo defense looks down the field the other way; online 1v1 everyone looks from behind the QB
+  const fdr = fbDirNow(), wx = il > 0 ? fdr*iy/il*sp : 0, wz = il > 0 ? fdr*ix/il*sp : 0;      // solo defense looks down the field the other way; online 1v1 everyone looks from behind the QB
   fbVel(d, wx, wz, dt, 34);
   d.st = d.carry ? 'carry' : (d.jumpT > 0 ? 'reach' : 'ready');
 }
@@ -8196,7 +8205,7 @@ const fbnIsGuest = () => FBN.on && FBN.role==='guest';
 function fbMain(){ if (FBN.on && FBN.role==='guest') fbnGuestStep(); else { fbStep(); if (FBN.on) fbnHostTick(); } }
 function fbVs(){ return !!(FBN.on && FBN.mode==='vs'); }
 function fbFlip(){ const s = FB.s; return !!(s && s.defMode && !fbVs()); }     // V81: online 1v1 = EVERYONE sees the play from behind the QB (solo / co-op defense keeps its own view)
-function fbDirNow(){ return fbFlip() ? -1 : 1; }
+function fbDirNow(){ const s = FB.s; return (fbFlip() || (s && s.turn)) ? -1 : 1; }      // after a turnover everyone sees the field from the other end
 function fbVsFix(t){                                                          // drive-screen text is written once (tokens) and read per player
   if (typeof t!=='string' || t.indexOf('{')<0) return t; const g = FBN.role==='guest', on = fbnOtherName();
   const H = g ? on : 'YOU', Hp = g ? on+"'S" : 'YOUR', G = g ? 'YOU' : on;
@@ -8246,8 +8255,8 @@ function fbnRecv(p, dt){
   const K = FBN.gk, ix = (K.KeyD ? 1:0) - (K.KeyA ? 1:0), iy = (K.KeyW ? 1:0) - (K.KeyS ? 1:0), il = Math.hypot(ix,iy), s = FB.s;
   if (il > 0) p.man = true;
   if (!p.man) return false;
-  const sp = (K.ShiftLeft ? 10.4 : 6.4) * fbRm(p);
-  fbVel(p, il>0 ? iy/il*sp : 0, il>0 ? ix/il*sp : 0, dt, 32);
+  const sp = (K.ShiftLeft ? 10.4 : 6.4) * fbRm(p), dsg = fbDirNow();
+  fbVel(p, il>0 ? dsg*iy/il*sp : 0, il>0 ? dsg*ix/il*sp : 0, dt, 32);
   if (p.reachT > 0) { p.reachT -= dt; p.st = 'reach'; } else p.st = 'ready';
   return true;
 }
@@ -10876,7 +10885,7 @@ document.querySelectorAll('#pad button').forEach(btn => {
 buildSetup(); refresh(); snapshotRules();
 function buildBG(){ if (hemi) { applyTheme(); } }
 buildWorld(); buildRigs(); setupRenderer(); setupPossession('p1');
-API.dbg = { G, DUO, ECOP, ECO, proj, CHESTER, FBN, fbnCleanPlay, fbCustomBuild, fbnRunCustom, fbCadence, fbHutVoice, ECOM, fbCpuCustomPlay, fbCpuDPlan, fbSetup, fbRouteEnds, fbOver, ecoFbOnline, ECO, fbTossPre, fbTossOk, fbSnapNow, makeRig, updateRig, THREE, shade, fbRigs, fbDefToCall, fbCam, R3, get fbScene(){return fbScene} };
+API.dbg = { G, DUO, ECOP, ECO, proj, CHESTER, FBN, fbnCleanPlay, fbCustomBuild, fbnRunCustom, fbCadence, fbHutVoice, ECOM, fbCpuCustomPlay, fbCpuDPlan, fbSetup, fbRouteEnds, fbOver, ecoFbOnline, ECO, fbTossPre, fbTossOk, fbSnapNow, makeRig, updateRig, THREE, shade, fbRigs, fbIntercept, fbDefToCall, fbCam, R3, get fbScene(){return fbScene} };
 API.fb = { FB, FBP, FBD, defStart:(y,w)=>fbDefStart(y,w), defPick:id=>fbDefPick(id), defSet:d=>fbDefSet(d), defNear:()=>fbDefNearest(), tutStart:()=>fbTutStart(), cpuPoss:fbCpuPoss, cpuPlay:()=>fbCpuPlay(), enter:()=>fbEnter(), step:()=>fbStep(), act:id=>fbAct(id), call:p=>fbCallPlay(p), snap:()=>fbSnapNow(), throwTo:(x,z,p)=>fbThrow({x,z},p), rigs:fbRigs, by:fbBy, end:fbEnd, kickStart:fbKickStart, kickLock:fbKickLock, drive:fbDriveGo, cpu:fbCpuDrive, cam:()=>[fbCam.position.toArray(), FB.cam, FB.s.camFocus, fbSun.position.toArray()] };
 API.hub = { HUB, HUBP, enter:(s,f)=>hubEnter(s,f), step:()=>hubStep(), act:id=>hubAct(id), go:id=>hubGo(id), do:id=>hubDo(id), portals:HUB_PORTALS }; API.eco = { ECO, ecoBuy, ecoPayout, ecoBBEnd, ecoFbPlay, ecoFbEnd, ecoEquip, ecoItem, ecoShopEnter, ecoShopAct, ecoShopItems, ECO_DOORS, ECO_ITEMS, ecoCrateRoll, ecoRideNow, ECO_RSPEC };
 API.party = PARTY; API.fbn = FBN; API.fbnx = { main:()=>fbMain(), ev:e=>fbnEv(e), act:id=>fbnGuestAct(id), lead:m=>fbnLeaderStart(m) };
