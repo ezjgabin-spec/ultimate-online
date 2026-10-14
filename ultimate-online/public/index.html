@@ -672,6 +672,18 @@ const ease=v=>{v=clamp(v,0,1);return v*v*(3-2*v);};
 function resetRig(rig){rig.root.rotation.set(0,Math.PI/2,0);rig.upper.rotation.set(0,0,0);rig.pelvis.rotation.set(0,0,0);rig.arms.forEach(a=>{a.sh.rotation.set(0,0,0);a.el.rotation.set(0,0,0);});rig.legs.forEach(l=>{l.hip.rotation.set(0,0,0);l.knee.rotation.set(0,0,0);});}
 // Solve the real avatar arm segments to a grip point, preserving their lengths.
 function gripArm(avatar,arm,target,pole){avatar.updateMatrixWorld(true);const shoulder=arm.sh.getWorldPosition(new T.Vector3()),scale=arm.sh.getWorldScale(new T.Vector3()).y,L1=.76*scale,L2=.74*scale,axis=target.clone().sub(shoulder),d=clamp(axis.length(),.015,L1+L2-.002);axis.normalize();const bend=pole.clone().sub(shoulder);bend.addScaledVector(axis,-bend.dot(axis));if(bend.lengthSq()<.00001)bend.set(1,0,0);bend.normalize();const along=(L1*L1-L2*L2+d*d)/(2*d),elbow=shoulder.clone().addScaledVector(axis,along).addScaledVector(bend,Math.sqrt(Math.max(0,L1*L1-along*along))),down=new T.Vector3(0,-1,0),parent=arm.sh.parent;const localDir=parent.worldToLocal(elbow.clone()).sub(arm.sh.position).normalize();arm.sh.quaternion.setFromUnitVectors(down,localDir);avatar.updateMatrixWorld(true);const foreDir=arm.sh.worldToLocal(target.clone()).sub(arm.el.position).normalize();arm.el.quaternion.setFromUnitVectors(down,foreDir);}
+// The park emote uses the same low kneel and arm solver as the chicken scene.
+window.IslandAirGrapple=function(rig,age){
+ const blend=ease(age/.45)*(1-ease((age-5.9)/.6)),rock=Math.sin(age*3.7*2)*blend,root=rig.root,S=rig.S;
+ rig.pelvis.position.y=2.12+(.82-2.12)*blend;rig.pelvis.rotation.x=0;
+ rig.upper.rotation.z=-.65*blend+rock*.09;rig.headG.rotation.z=.3*blend;
+ rig.legs.forEach((l,i)=>{l.hip.rotation.z=(i?.8:1.18)*blend;l.knee.rotation.z=(i?-1.6:-1.95)*blend;});
+ root.updateMatrixWorld(true);
+ const point=(forward,height,side)=>root.localToWorld(new T.Vector3(forward/S,height/S,side/S));
+ const grips=[point(.715,.43,-.08),point(.56,.43,.08)],poles=[point(.70,.43,.30),point(.60,.50,-.28)];
+ const forward=new T.Vector3(1,0,0).applyQuaternion(root.quaternion);root.position.addScaledVector(forward,rock*.10);
+ rig.arms.forEach((arm,i)=>{const sh=arm.sh.quaternion.clone(),el=arm.el.quaternion.clone();gripArm(root,arm,grips[i],poles[i]);arm.sh.quaternion.slerp(sh,1-blend);arm.el.quaternion.slerp(el,1-blend);});
+};
 function chickenAnchor(s,actor){const q=actor.scene,t=s.elapsed-q.start,hold=ease((t-1)/1.4)*(1-ease((t-7.4)/.65)),sway=Math.sin(t*3.7)*.025*hold;return {x:q.targetX-Math.sin(q.yaw)*sway,z:q.targetZ-Math.cos(q.yaw)*sway,y:C.terrain(s.seed,q.targetX,q.targetZ),yaw:q.yaw,hold};}
 function pose(world,avatar,p,s){const q=p.scene,t=q?s.elapsed-q.start:0,rig=avatar.userData.hubRig,old=avatar.userData.lastWildPos,speed=old?Math.min(6,Math.hypot(p.x-old.x,p.z-old.z)/Math.max(.001,world._dt||.016)):0;avatar.userData.lastWildPos={x:p.x,z:p.z};avatar.position.set(p.x,p.y,p.z);avatar.rotation.set(0,p.yaw||0,0);avatar.scale.setScalar(1);if(!rig)return;resetRig(rig);window.BLACKTOP.expedition.animateAvatar(rig,{time:s.elapsed,speed:q?.kind==='slide'&&t<.65?6:speed,seated:!!p.onRaft,swimming:!!p.swimming,fastSwim:!!p.fastSwim,activity:p.activity});rig.root.rotation.y=Math.PI/2;
  if(q?.kind==='chickenWrestle'){const anchor=chickenAnchor(s,p),blend=anchor.hold,rock=Math.sin(t*3.7)*blend;rig.pelvis.position.y=2.12+(.82+((q.neckY||.43)-.43)/rig.S-2.12)*blend;rig.upper.rotation.z=-.65*blend+rock*.09;rig.headG.rotation.z=.3*blend;rig.legs.forEach((l,i)=>{l.hip.rotation.z=(i?.8:1.18)*blend;l.knee.rotation.z=(i?-1.6:-1.95)*blend;});// Rock along the chicken's head-to-tail axis while the arm grips stay attached.
@@ -9825,9 +9837,13 @@ function hubPoseWalk(rig, o){ // o: {x,z,face,sp,anim,y}
   if (o.wave) { P.fh = h(1.2,4.0+0.5*Math.sin(HUB.t*9)); P.trackF = true; }
   if (o.emote==='dance') { const t = HUB.t*7.5, a = Math.sin(t), b = Math.cos(t*0.5); P.fh = h(0.9+0.5*a, 2.6+1.3*Math.max(0,a)); P.bh = h(0.9-0.5*a, 2.6+1.3*Math.max(0,-a)); P.lean = 0.1*b; P.tilt = 0.15*a; P.bounce = 0.12*Math.abs(Math.sin(t)); P.crouch = 0.25+0.2*Math.abs(a); P.trackF = P.trackB = true; P.faceAbs = o.face + 0.35*b; }
   else if (o.emote==='cheer') { const t = HUB.t*9; P.fh = h(0.4,4.3+0.25*Math.sin(t)); P.bh = h(0.4,4.3+0.25*Math.sin(t+1)); P.bounce = 0.5*Math.abs(Math.sin(t*0.5)); P.trackF = P.trackB = true; P.tilt = -0.1; }
-  else if (o.emote==='flex') { P.fh = h(0.9,3.1); P.bh = h(-0.1,3.1); P.spread = 0.9; P.crouch = 0.15; P.trackF = P.trackB = true; P.tilt = 0.05*Math.sin(HUB.t*4); }
+  else if (o.emote==='flex') { P.run=false; P.sp=0; P.lean=0; P.tilt=0; }
   if (o.ride) ecoRidePoseP(P, o.ride, o);
   updateRig(rig, P);
+  if(o.emote==='flex'&&!o.ride){
+    if(rig._airGrappleStart===undefined)rig._airGrappleStart=HUB.t;
+    window.IslandAirGrapple?.(rig,HUB.t-rig._airGrappleStart);
+  }else delete rig._airGrappleStart;
 }
 
 /* ---------------------------------------------------------------- build the park */
@@ -10330,7 +10346,13 @@ window.addEventListener('keydown', e => {
 
   if (LOB.inv && (e.code==='KeyY' || e.code==='KeyN')) { lobbyAnswer(e.code==='KeyY'); return; }
   if (e.code==='KeyT' && HUB.scr==='park') { if (lobbyNearWins()) lobbyInvite(); else hubAskNpc(); return; }
-  if (HUB.scr==='park' && /^Digit[1-3]$/.test(e.code)) { const k = ['dance','cheer','flex'][+e.code.slice(5)-1]; HUB.me.emote = { k, until:HUB.t+4 }; try { lobbyEmote(k); } catch(_){} return; }
+  if (HUB.scr==='park' && /^Digit[1-3]$/.test(e.code)) {
+    const k = ['dance','cheer','flex'][+e.code.slice(5)-1]; HUB.me.emote = { k, until:HUB.t+(k==='flex'?6.5:4), emoteAt:HUB.t };
+    delete HUB.rig._airGrappleStart;
+    if(HUB.grappleAudio){HUB.grappleAudio.pause();HUB.grappleAudio=null;}
+    if(k==='flex'&&rules.sound&&window.ISLAND_MEDIA?.groan){try{const a=new Audio(window.ISLAND_MEDIA.groan),em=HUB.me.emote;HUB.grappleAudio=a;a.loop=true;a.playbackRate=2;a.volume=.42;a.play().catch(()=>{});const timer=setInterval(()=>{if(!HUB.on||HUB.scr!=='park'||HUB.me.emote!==em||HUB.t>em.until||!rules.sound||API.freeze){a.pause();if(HUB.grappleAudio===a)HUB.grappleAudio=null;clearInterval(timer);}},80);}catch(_){} }
+    try { lobbyEmote(k); } catch(_){} return;
+  }
   if (e.code==='Escape' && HUB.modes) { HUB.modes = false; return; }
   if (e.code==='KeyR' && HUB.scr==='park' && ecoEqItem('ride')) { ECO.riding = !ECO.riding; ecoSave(); try { fbSfx('tick'); } catch(_){} ecoToast(ECO.riding ? 'HOPPED ON' : 'HOPPED OFF', '#9fd0ff'); return; }
   if (e.code==='Escape') { if (FB.full) { fbFullSet(false); return; } if (HUB.scr==='store' || HUB.scr==='shop') hubGo('park'); }
@@ -10987,7 +11009,7 @@ function lobbySendMove(force){
   LOB.room.emit('m', [r(m.x), r(m.z), mv ? r(m.vx) : 0, mv ? r(m.vz) : 0, r(m.face)]);
 }
 function lobbyEmote(k){ if (LOB.on && LOB.room && LOB_EMOTES.includes(k)) LOB.room.emit('em', k); }
-function lobbyGotEm(m){ const p = LOB.peers.get(m.peer); if (p && LOB_EMOTES.includes(m.data)) p.emote = { k:m.data, until:HUB.t+4 }; }
+function lobbyGotEm(m){ const p = LOB.peers.get(m.peer); if (p && LOB_EMOTES.includes(m.data)) {p.emote = { k:m.data, until:HUB.t+(m.data==='flex'?6.5:4) };if(p.rig)delete p.rig._airGrappleStart;} }
 function lobbyStep(dt){
   if (!HUB.on) return;
   if (!LOB.on) { lobbyJoin(); return; }
