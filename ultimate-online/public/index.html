@@ -5535,8 +5535,8 @@ function fbStartLive(){
       const isLB = d.role.charAt(0)==='L';
       const gm = (0.7+0.7*Math.random())*1.9;      // every play the pocket holds a different amount of time
       const beat = gm*(run ? D.rush*(0.65+1.1*Math.random()) : (isLB ? D.rush*(0.32+0.35*Math.random()) : D.rush*(0.35+1.3*Math.random())));
-      d.eng = o; o.eng = d; d.beat = (run ? beat : Math.max(beat, 1.2 + 0.25*D.rush + Math.random()*1.6))*0.75; // linemen win / shed faster now
-      if (!run) d.beat = Math.max(1.0, d.beat*(1-0.3*(s.learnL||0)));
+      d.eng = o; o.eng = d; d.beat = run ? Math.max(1.7, beat*1.15) : Math.max(2.1, beat*0.9, 1.5 + 0.3*D.rush + Math.random()*1.2);
+      if (!run) d.beat = Math.max(1.75, d.beat*(1-0.16*(s.learnL||0)));
       d.eng = o; o.eng = d; d.free = false;
       s.eng.push({o,d});
     } else d.free = true;
@@ -5635,19 +5635,19 @@ function fbLive(dt){
   }
   if (s.ctl && s.ctl.carry && s.ctl.x > s.los+0.25) s.pastLos = true;
   // ---- the QB when not controlled (e.g. after handoff / catch) stays put
-  [q].forEach(p => { if (p!==s.ctl && !p.down && !p.carry) { if (s.turn && s.carrier) fbMove(p, s.carrier.x, s.carrier.z, 5, dt, 26); else fbVel(p,0,0,dt,20); } });
+  [q].forEach(p => { if (p!==s.ctl && !p.down && !p.carry) { if (s.turn && s.carrier) { const tg=fbReturnPursuit(p,s.carrier); fbMove(p,tg.x,tg.z,7.2*fbRm(p),dt,30); } else fbVel(p,0,0,dt,20); } });
   // ---- receivers / RB run their routes
   fbOff().forEach(p => {
     const k = fbKind(p.role);
     if (k==='OL' || p.role==='QB' || p===s.ctl) return;
     if (p.down) return;
     if (p===s.rctl && FBN.on && fbnRecv(p,dt)) return;
-    if (s.turn) { const ch = s.carrier; fbMove(p, ch.x - ch.vx*0.25, ch.z, FB_SP[k.charAt(0)==='W'?'W':k]*0.95*fbRm(p), dt, 32); p.st = 'ready'; return; }
+    if (s.turn) { const ch = s.carrier, tg=fbReturnPursuit(p,ch); fbMove(p,tg.x,tg.z, FB_SP[k.charAt(0)==='W'?'W':k]*fbRm(p), dt, 34); p.st = 'ready'; return; }
     if (s.caught && p!==s.ctl && p!==s.carrier) { fbBlockAI(p,dt); return; }
     if (run && p!==s.carrier && (play.t==='run' ? p.role!=='RB' : (!p.route || p.blkr))) { fbRunBlock(p,dt); return; }
     if (p.route && p.ri < p.route.length) fbRouteStep(p,dt);
     else if (!p.route && (p.role==='RB' || p.blkr) && !run) { const t = s.eng.find(e => e.d.rusher && !e.d.free); /* RB stays to pass-block */ fbBlockRB(p,dt); }
-    else if (p.route && !p.blocking) { fbVel(p,0,0,dt,26); if (!s.thrown || true) fbFace(p, q.x, q.z); p.st = (p.reachT>0)?'reach':'ready'; }
+    else if (p.route && !p.blocking) { if (s.thrown && s.ball.mode==='fly') fbRouteContinue(p,dt); else { fbVel(p,0,0,dt,26); fbFace(p,q.x,q.z); p.st = (p.reachT>0)?'reach':'ready'; } }
     else fbVel(p,0,0,dt,26);
     if (p.reachT > 0) { p.reachT -= dt; p.st = 'reach'; }
   });
@@ -5659,14 +5659,14 @@ function fbLive(dt){
     if (!e.lock) { if (fbLineMeet(e, run, dt)) return; }
     if (s.t >= d.beat) { d.free = true; d.eng = null; o.eng = null; d.st = 'ready'; d.shedT = 0.4; o.st = 'stumble'; o.stun = 0.6; o.recoilT = 0.4; o.recoilDir = Math.random()<0.5?1:-1; fbDust(o.x,o.z,3,0.5); return; }
     d.st = 'block'; o.st = 'block';
-    if (run) { d.x += 1.0*dt; d.vx = 0.8; d.vz = Math.sin(s.t*8+d.num)*0.5; d.z += d.vz*dt*0.5; d.anim += 0.7; d.face = Math.PI; o.x += (d.x-0.95-o.x)*0.3; o.z += (d.z + (e.sh||0)-o.z)*0.3; o.face = 0; o.vx = 0.4; o.vz = 0; o.anim += 0.4; }
+    if (run) { const lane=s.carrier?s.carrier.z:0, drive=0.55+0.35*clamp(Math.abs(d.z-lane)/7,0,1); d.x += drive*dt; d.vx = drive; d.vz = Math.sin(s.t*8+d.num)*0.35; d.z += d.vz*dt*0.5; d.anim += 0.7; d.face = Math.PI; o.x += (d.x-0.95-o.x)*0.3; o.z += (d.z + (e.sh||0)-o.z)*0.3; o.face = 0; o.vx = drive*0.5; o.vz = 0; o.anim += 0.4; }
     else {
       const tx = s.ctl && s.ctl.role==='QB' ? s.ctl.x : q.x, tz = s.ctl && s.ctl.role==='QB' ? s.ctl.z : q.z, dx = tx-d.x, dz = tz-d.z, L = Math.hypot(dx,dz)||1;
       const wob = Math.sin(s.t*9+d.num)*0.35, nx = -dz/L, nz = dx/L; d.x += (dx/L*0.7 + nx*wob)*dt; d.z += (dz/L*0.7 + nz*wob)*dt; d.face = Math.atan2(-dz,dx); d.vx = dx/L*0.9; d.vz = dz/L*0.9; d.anim += 0.7; d.lean = 0.2;
       o.x += (d.x - dx/L*0.95 - o.x)*0.3; o.z += (d.z - dz/L*0.95 - o.z)*0.3; o.face = d.face; o.vx = d.vx; o.vz = d.vz; o.anim += 0.7;
     }
   });
-  fbOff().forEach(p => { if (fbKind(p.role)==='OL' && !p.eng && !p.down) { if (p.stun>0) { p.stun -= dt; } else { p.st = 'block'; } if (s.turn && s.carrier && p!==s.ctl) fbMove(p, s.carrier.x, s.carrier.z, 5.5, dt, 26); else if (p!==s.ctl && !(p.stun > 0) && fbOlPickup(p, run, dt)) {} else if (p!==s.ctl) fbVel(p,0,0,dt,20); } });
+  fbOff().forEach(p => { if (fbKind(p.role)==='OL' && !p.eng && !p.down) { if (p.stun>0) { p.stun -= dt; } else { p.st = 'block'; } if (s.turn && s.carrier && p!==s.ctl) { const tg=fbReturnPursuit(p,s.carrier); fbMove(p,tg.x,tg.z,6.4,dt,26); } else if (p!==s.ctl && !(p.stun > 0) && fbOlPickup(p, run, dt)) {} else if (p!==s.ctl) fbVel(p,0,0,dt,20); } });
   // ---- defense
   if (s.defMode) fbDefCtl(dt);
   if (s.gdc) fbDefCtlOne(s.gdc, fbKeysOf(s.gdc), 'gTackle', dt);
@@ -5691,11 +5691,29 @@ function fbRouteStep(p, dt){
   // slow a hair at the corners
   p.st = p.carry ? 'carry' : 'ready';
 }
+function fbRouteContinue(p, dt){
+  const r=p.route, end=r[r.length-1], prev=r.length>1?r[r.length-2]:{0:p.x-5,1:p.z};
+  let dx=end[0]-prev[0], dz=end[1]-prev[1], len=Math.hypot(dx,dz)||1;
+  dx/=len; dz/=len;
+  // Keep the pattern alive after its last waypoint while the pass is airborne.
+  if (Math.abs(p.z)>FB_Z-3 && dz*Math.sign(p.z)>0) dz=0;
+  fbMove(p,clamp(p.x+dx*7,1,118),clamp(p.z+dz*7,-FB_Z+1,FB_Z-1),p.spd||8,dt,26);
+  p.st=p.reachT>0?'reach':'ready';
+}
+function fbReturnPursuit(p,car){
+  const dist=Math.hypot(car.x-p.x,car.z-p.z);
+  if (dist<2.5) return {x:car.x,z:car.z};
+  const speed=FB_SP[fbKind(p.role)]||8;
+  const lead=clamp(dist/(speed+3),0.22,1.25);
+  // Intercept the return path, with outside players containing the sideline.
+  const edge=Math.abs(car.z)>FB_Z-7 ? -Math.sign(car.z)*0.7 : 0;
+  return {x:clamp(car.x+car.vx*lead,1,119),z:clamp(car.z+car.vz*lead+edge,-FB_Z+1,FB_Z-1)};
+}
 function fbBlockRB(p, dt){
   const s = FB.s; p.blocking = true;
   const q = fbBy('QB'), sc = (s.cpuProt||0) >= 2, u = s.dctl && !s.dctl.down && (sc ? fbDist(s.dctl,q) < 13 : (s.dctl.x < s.los + 0.5 && fbDist(s.dctl,q) < 9)) ? s.dctl : null;
-  const thr = (u && (p.role==='RB' || !fbOff().some(o => o!==p && o.bTg===u))) ? u : fbDef().filter(d => d.rusher && d.free && !d.down).sort((a,b) => fbDist(a,p)-fbDist(b,p))[0];
-  if (thr && fbDist(thr,q) < (thr===u ? 13 : 7)) { const k2 = thr===u ? 0.3 : 0.5, tx = thr.x + (q.x-thr.x)*k2, tz = thr.z + (q.z-thr.z)*k2; fbMove(p,tx,tz,thr===u ? 8 : 7,dt,40); p.st = 'block'; if (fbDist(p,thr) < 1.3 && fbSkillBlock(p, thr, 0.3)) { thr.blockedBy = p; fbFace(p, thr.x, thr.z); } }
+  const thr = (u && (p.role==='RB' || !fbOff().some(o => o!==p && o.bTg===u))) ? u : fbDef().filter(d => d.rusher && d.free && !d.down).sort((a,b) => fbDist(a,q)-fbDist(b,q))[0];
+  if (thr && fbDist(thr,q) < (thr===u ? 13 : 10)) { const k2 = thr===u ? 0.3 : 0.48, tx = thr.x + (q.x-thr.x)*k2, tz = thr.z + (q.z-thr.z)*k2; fbMove(p,tx,tz,thr===u ? 8 : 8.2,dt,40); p.st = 'block'; if (fbDist(p,thr) < 1.45 && fbSkillBlock(p, thr, 0.25)) { thr.blockedBy = p; fbFace(p, thr.x, thr.z); } }
   else { fbVel(p,0,0,dt,26); p.st = 'ready'; }
 }
 function fbRunBlock(p, dt){
@@ -5707,10 +5725,10 @@ function fbRunBlock(p, dt){
     tg = fbDef().filter(d => !d.down && !d.tackling && !(d.eng && !d.free) && !taken.has(d) && !(d.shedFrom===p && d.shedT2 > s.t) && d.x > s.los - 3 && fbDist(d,p) < 16).sort((a,b) => fbDist(a,p)-fbDist(b,p))[0] || null;
     p.btg = tg;
   }
-  if (!tg) { fbMove(p, p.x + 3, p.z, 5, dt, 26); p.st = 'ready'; return; }
-  const dx = car.x - tg.x, dz = car.z - tg.z, L = Math.hypot(dx,dz) || 1;     // get between him and the ball
-  fbMove(p, tg.x + dx/L*0.9, tg.z + dz/L*0.9, (FB_SP[fbKind(p.role)]||9)*0.92*fbRm(p), dt, 34);
-  if (fbDist(p,tg) < 1.35) { p.st = 'block'; fbFace(p, tg.x, tg.z); if (!fbSkillBlock(p, tg, 0.4)) p.btg = null; } else p.st = 'ready';
+  if (!tg) { fbMove(p, Math.max(p.x+3,car.x+2), p.z+(car.z-p.z)*0.25, 6.5, dt, 28); p.st = 'ready'; return; }
+  const laneZ=car.z+clamp(car.vz*0.28,-1.5,1.5), dx=car.x-tg.x, dz=laneZ-tg.z, L=Math.hypot(dx,dz)||1;
+  fbMove(p,tg.x+dx/L*1.0,tg.z+dz/L*1.0,(FB_SP[fbKind(p.role)]||9)*fbRm(p),dt,36);
+  if (fbDist(p,tg) < 1.5) { p.st = 'block'; fbFace(p, tg.x, tg.z); if (!fbSkillBlock(p, tg, 0.29)) p.btg = null; } else p.st = 'ready';
 }
 function fbBlockAI(p, dt){
   const s = FB.s, tg = fbDef().filter(d => !d.down).sort((a,b) => fbDist(a,s.carrier||s.ctl)-fbDist(b,s.carrier||s.ctl))[0];
@@ -6831,6 +6849,7 @@ document.getElementById('game').addEventListener('pointerdown', e => {
     const d = FB.diagRect, x = px*W, y = py*H;
     if (x>=d.x-4 && x<=d.x+d.w+4 && y>=d.y-4 && y<=d.y+d.h+4) { if (fbCustomBallHit(x,y)) FB.dragBall = true; else fbCustomDown(x,y); }
   }
+  if (sc==='live' && s.turn) { fbReturnPickAt(px,py); return; }
   if (sc==='live' && s.defMode) { fbDefPickAt(px,py); return; }
   if (sc==='live') {
     s.hover = { px, py };
@@ -7492,8 +7511,26 @@ function fbDefSet(d){
 }
 function fbDefPickAt(px, py){
   let best = null, bd = 1e9;
-  fbDef().forEach(d => { const [x,y,z] = fbProj(d.x, 1.3, d.z); if (z > 1) return; const dd = Math.hypot(x-px*W, y-py*H); if (dd < bd) { bd = dd; best = d; } });
+  fbDef().forEach(d => { if (d.down) return; const [x,y,z] = fbProj(d.x, 1.3, d.z); if (z > 1) return; const dd = Math.hypot(x-px*W, y-py*H); if (dd < bd) { bd = dd; best = d; } });
   if (best && bd < 36) fbDefSet(best);
+}
+function fbReturnPickAt(px, py){
+  const s = FB.s;
+  if (!s || !s.turn || FB.scr !== 'live') return false;
+  if (s.defMode) { fbDefPickAt(px, py); return true; }
+  let best = null, bd = 36;
+  fbOff().forEach(p => {
+    if (p.down) return;
+    const [x,y,z] = fbProj(p.x, 1.3, p.z);
+    if (z > 1) return;
+    const d = Math.hypot(x-px*W, y-py*H);
+    if (d < bd) { bd = d; best = p; }
+  });
+  if (best && best !== s.ctl) {
+    if (FBN.on && FBN.role === 'guest') fbnEv({ n:'pickO', r:best.role });
+    s.ctl = best; best.auto = false; best.route = null; fbSfx('tick');
+  }
+  return true;
 }
 function fbDefNearest(){
   const s = FB.s, b = s.ball, ref = s.carrier || (b.mode==='held' && b.h ? b.h : b);
@@ -7556,7 +7593,7 @@ function fbRoutePred(o, dist){
 }
 function fbCpuInput(c, dt){
   const s = FB.s, Z = { dx:0, dz:0, spr:false };
-  if (s.turn) { const ch = s.carrier; if (!ch) return Z; const dx = ch.x+ch.vx*0.35-c.x, dz = ch.z+ch.vz*0.35-c.z, L = Math.hypot(dx,dz) || 1; return { dx:dx/L, dz:dz/L, spr:true }; }
+  if (s.turn) { const ch = s.carrier; if (!ch) return Z; const tg=fbReturnPursuit(c,ch), dx=tg.x-c.x, dz=tg.z-c.z, L=Math.hypot(dx,dz)||1; return { dx:dx/L, dz:dz/L, spr:true }; }
   if (c.role==='QB' && !c.carry && !s.thrown) return fbIsRun(s.play) ? Z : fbCpuQB(c, dt);
   if (c.carry) return fbCpuCarry(c, dt);
   return Z;
@@ -8143,7 +8180,7 @@ function fbDPlanLive(run){
     const gm = (0.7+0.7*Math.random())*1.9;
     const beat = gm*(run ? D.rush*(0.65+1.1*Math.random()) : (isDL ? D.rush*(0.35+1.3*Math.random()) : D.rush*(0.32+0.35*Math.random())));
     d.eng = o; o.eng = d; d.free = false; d.picked = true;
-    d.beat = run ? beat : Math.max(beat, 1.6 + 0.35*D.rush + Math.random()*2.2);
+    d.beat = run ? Math.max(1.7,beat*1.15) : Math.max(beat, 2.0 + 0.3*D.rush + Math.random()*1.4);
     s.eng.push({ o, d });
   });
   s.freeOl = free;
@@ -8765,13 +8802,13 @@ function fbOlPickup(o, run, dt){
   const s = FB.s, q = fbBy('QB'), D = FBD[FB.diff];
   if (s.thrown || s.turn) return false;
   const prot = s.carrier && s.carrier.carry ? s.carrier : q; if (!prot || prot.down) return false;
-  let best = null, bd = 7.5;
-  fbDef().forEach(d => { if (!d.rusher || !d.free || d.down || d.tackling || (d.pickN||0) >= 1 || d.x > s.los + 6) return; const k = fbDist(d,prot); if (k < bd && fbDist(d,o) < 9) { bd = k; best = d; } });
+  let best = null, bd = 10;
+  fbDef().forEach(d => { if (!d.rusher || !d.free || d.down || d.tackling || (d.pickN||0) >= 1 || d.x > s.los + 7) return; const k = fbDist(d,prot); if (k < bd && fbDist(d,o) < 10) { bd = k; best = d; } });
   if (!best) return false;
   const ix = (best.x*0.55 + prot.x*0.45), iz = (best.z*0.6 + prot.z*0.4);         // step into his path to the passer
   fbMove(o, ix, iz, FB_SP.OL, dt, 26); o.st = 'block'; o.face = Math.atan2(-(best.z-o.z), best.x-o.x);
-  if (fbDist(o,best) < 1.05) {
-    best.pickN = (best.pickN||0) + 1; best.free = false; best.eng = o; o.eng = best; best.beat = s.t + (0.35 + Math.random()*0.55)*Math.max(0.6, D.rush);
+  if (fbDist(o,best) < 1.3) {
+    best.pickN = (best.pickN||0) + 1; best.free = false; best.eng = o; o.eng = best; best.beat = s.t + (0.7 + Math.random()*0.5)*Math.max(0.7, D.rush);
     s.eng.push({ o, d:best, lock:true, sh:0 }); fbSfx('hit'); fbDust(o.x,o.z,3,0.5);
   }
   return true;
@@ -9258,6 +9295,7 @@ function fbnHostEv(e){
   else if (e.n==='e') { if (sc==='live' && (fbnGuestOff() || (s.rctl && s.ctl===s.rctl))) s.wantJuke = true; }
   else if (e.n==='rs') { if (FBN.mode==='coop' && !s.defMode && sc==='pre') { FBN.rsel = e.r; s.rctl = fbBy(e.r) || s.rctl; fbSfx('tick'); } }
   else if (e.n==='pick') { const d = fbBy(e.r); if (d && d.side==='D' && d!==s.dctl && !d.down && (s.gdc || FBN.mode)) { if (s.gdc) { s.gdc.tkWin = 0; s.gdc.dashT = 0; } s.gdc = d; d.tkWin = 0; d.dashT = 0; } }
+  else if (e.n==='pickO') { const p = fbBy(e.r); if (fbnGuestOff() && sc==='live' && s.turn && p && p.side==='O' && !p.down) { s.ctl = p; p.auto = false; p.route = null; } }
   else if (e.n==='cd') { if (fbnGuestOff() && sc==='live' && s.ctl && s.ctl.role==='QB' && !s.thrown && !s.ctl.carry) { if (s.pastLos) fbMsg('PAST THE LINE - NO THROW','#ff6b6b',60); else { s.charging = true; s.chargeF = 0; s.charge = 0; } } }
   else if (e.n==='cu') { if (s.charging && fbnGuestOff()) { s.charging = false; fbThrow({ x:e.x, z:e.z }, (s.chargeF||0) < 12 ? 0 : Math.max(0.1, s.charge)); } }
   else if (e.n==='act') fbnHostAct(e);
@@ -9494,6 +9532,7 @@ function fbnGuestPtr(px,py,sc){
   if (sc==='drive') { fbnEv({ n:'act', id:'drv' }); return; }
   if (sc==='live') {
     s.hover = { px, py };
+    if (s.turn) { fbReturnPickAt(px,py); return; }
     if (s.defMode) { fbDefPickAt(px,py); return; }
     if (FBN.mode==='vs' && s.ctl && s.ctl.role==='QB' && !s.thrown && !s.ctl.carry) {
       if (s.pastLos) { fbMsg('PAST THE LINE - NO THROW','#ff6b6b',60); return; }
